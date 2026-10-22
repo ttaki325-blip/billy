@@ -1,0 +1,3377 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>Billy 방탈출 — 영어 문장 쓰기</title>
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Roboto+Slab:wght@500;700&display=swap" rel="stylesheet">
+<script>
+/* qrcode-generator 1.4.4 (MIT, Kazuhiko Arase) */
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(row * cellSize, col * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+      define([], factory);
+  } else if (typeof exports === 'object') {
+      module.exports = factory();
+  }
+}(function () {
+    return qrcode;
+}));
+
+</script>
+<style>
+:root{--bg:#0b0f14;--panel:#151c26;--panel2:#1d2733;--line:#2c3a4a;--text:#e8eef5;--mute:#93a3b5;--red:#e11d48;--green:#10b981;--sky:#38bdf8;--gold:#fbbf24;--violet:#a78bfa}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;min-height:100%}
+body{background:radial-gradient(1200px 600px at 50% -10%,#1b2433 0%,var(--bg) 60%) fixed}
+button{font:inherit;cursor:pointer;border:0;border-radius:14px;padding:.6em 1em;font-weight:800;color:var(--text);background:var(--panel2)}
+button:active{transform:scale(.97)}
+button.red{background:var(--red);color:#fff}
+button.green{background:var(--green);color:#04221a}
+button.ghost{background:transparent;border:2px solid var(--line)}
+button:disabled{opacity:.4;cursor:default}
+input,textarea{font:inherit}
+.creep{font-family:Creepster,cursive;letter-spacing:.04em;font-weight:400}
+.slab{font-family:"Roboto Slab",Georgia,serif;font-weight:700}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mute{color:var(--mute)}
+.small{font-size:.85em}
+h1,h2,h3{margin:.2em 0}
+.chip{display:inline-block;padding:.45em .9em;border-radius:999px;border:2px solid var(--line);background:var(--panel2);font-weight:700;margin:3px;cursor:pointer;user-select:none}
+.chip.on{border-color:var(--red);background:#3a1220;color:#fff}
+.grp{margin:14px 0}
+.grp>.lbl{font-weight:900;margin-bottom:6px}
+.hint{color:var(--mute);font-size:.9em;margin-top:4px}
+.toggle{display:flex;align-items:center;gap:10px;margin:10px 0;font-weight:800;cursor:pointer}
+.toggle input{width:22px;height:22px}
+/* TV */
+.tvtop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;background:#0f151d;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.tvtop .grow{flex:1}
+.big-timer{font-size:2.2rem;font-weight:900;font-variant-numeric:tabular-nums}
+.stat{background:var(--panel2);border-radius:12px;padding:6px 12px;font-weight:800}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.pcard{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:10px;cursor:pointer;position:relative}
+.pcard.esc{border-color:var(--gold);background:#2a2410}
+.pcard .nm{font-weight:900;font-size:1.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard .pl{font-size:.85rem;color:var(--mute);margin:2px 0 6px}
+.bar{height:8px;background:#0b0f14;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--red),var(--gold))}
+.feed{display:flex;flex-direction:column;gap:6px}
+.feed div{background:var(--panel);border-radius:10px;padding:6px 10px;font-size:.95rem}
+.names{display:flex;flex-wrap:wrap;gap:8px}
+.names .chip{font-size:1.2rem}
+.lobby{display:grid;grid-template-columns:minmax(260px,420px) 1fr;gap:20px}
+@media (max-width:800px){.lobby{grid-template-columns:1fr}}
+#qr,#qr2{background:#fff;padding:14px;border-radius:16px;display:inline-block}
+.code{font-size:3rem;font-weight:900;letter-spacing:.15em}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.ov .box{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:22px;max-width:760px;width:100%;max-height:92vh;overflow:auto}
+.toast{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);background:linear-gradient(135deg,#3a2a05,#6b4a06);border:3px solid var(--gold);border-radius:24px;padding:26px 40px;font-size:2.4rem;font-weight:900;z-index:80;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:pop .4s}
+@keyframes pop{from{transform:translate(-50%,-50%) scale(.6);opacity:0}}
+.slide{min-height:70vh;display:flex;flex-direction:column;gap:14px;justify-content:center}
+.slide h2{font-size:2.4rem}
+.bigstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.bigstats div{background:var(--panel);border-radius:18px;padding:16px;text-align:center}
+.bigstats b{display:block;font-size:2.4rem}
+table.res{width:100%;border-collapse:collapse;font-size:1.15rem}
+table.res td,table.res th{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+.bad{color:#fb7185;text-decoration:underline wavy}
+.good{color:#6ee7b7}
+.pcard-bigtxt{font-size:2rem}
+.prac{font-size:2.6rem;text-align:center;line-height:1.4}
+/* Student */
+.st{max-width:820px;margin:0 auto;padding:10px 12px 40px}
+.sbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#0f151d;border-bottom:1px solid var(--line);padding:8px 12px;position:sticky;top:0;z-index:5;font-weight:800}
+.sbar .grow{flex:1}
+.scene{background:var(--panel);border-radius:20px;padding:16px;margin-top:10px}
+.scene .emo{font-size:3rem;text-align:center}
+.scene .en{font-size:1.25rem;line-height:1.5}
+.scene .ko{color:var(--mute);margin-top:6px}
+.place{font-family:Creepster,cursive;font-size:1.6rem;color:#fda4af}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media (max-width:560px){.choices{grid-template-columns:1fr}}
+.choice{background:#1f2a37;border:3px solid var(--line);border-radius:18px;padding:14px;cursor:pointer;font-size:1.2rem;position:relative;min-height:80px}
+.choice.on{border-color:var(--sky);background:#0c2a3d}
+.choice .tag{position:absolute;top:-10px;right:10px;background:var(--sky);color:#04202f;font-size:.75rem;padding:2px 8px;border-radius:99px;font-weight:900}
+.builder{background:var(--panel);border-radius:20px;padding:14px;margin-top:12px}
+.tiles{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.tile{background:#fde68a;color:#3b2a00;border-radius:12px;padding:.45em .9em;font-weight:900;font-size:1.2rem;cursor:pointer;user-select:none;border:3px solid #f59e0b}
+.tile.used{opacity:.25;pointer-events:none}
+.tile.sel{background:#fef3c7}
+.tile.wrong{background:#fecdd3;border-color:#e11d48}
+.slot{min-height:52px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:2px dashed var(--line);border-radius:14px;padding:6px}
+.inwrap{position:relative;flex:1;min-width:200px}
+.inwrap .ghosttxt,.inwrap input{font-size:1.3rem;padding:.55em .7em;border-radius:14px;width:100%;font-family:"Roboto Slab",Georgia,serif;font-weight:500;letter-spacing:0}
+.inwrap input{border:3px solid var(--sky);background:transparent;color:#0b0f14;position:relative;z-index:2;outline:none}
+.inwrap .bgw{position:absolute;inset:0;background:#fff;border-radius:14px;z-index:0}
+.inwrap .ghosttxt{position:absolute;inset:0;border:3px solid transparent;color:#cbd5e1;z-index:1;white-space:pre;overflow:hidden;pointer-events:none}
+.inwrap .ghosttxt .typed{color:transparent}
+.inwrap.okb input{border-color:var(--green)}
+.inwrap.badb input{border-color:#fb7185}
+.go{font-size:1.3rem;padding:.6em 1.2em}
+.fb{margin-top:8px;font-weight:800;min-height:1.4em}
+.center{text-align:center}
+.dead{min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
+.dead .t{font-size:4rem;color:var(--red)}
+.trapcard{width:180px;border-radius:20px;padding:12px;text-align:center;background:linear-gradient(#ddd6fe,#a78bfa);color:#2e1065;border:4px solid #c4b5fd}
+.trapcard .e{font-size:3.4rem}
+.coll{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.coll div{background:var(--panel2);border-radius:14px;padding:8px;text-align:center;font-weight:800;font-size:.85rem}
+.coll div .e{font-size:2rem}
+.mic{font-size:1.3rem;padding:.55em .7em}
+.mic.on{background:var(--red);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
+.sent span{margin-right:.3em}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="ov"></div>
+<div id="toast"></div>
+<script>
+/* ============ 설정: Firebase 주소 ============ */
+const DB_URL = "https://ninja-game-56862-default-rtdb.firebaseio.com";
+const ROOT = "rooms";        // 닌자 게임 DB에서 쓰기가 허용된 폴더
+const PREFIX = "billy-";      // 방 이름 앞에 붙여서 닌자 방(숫자)과 섞이지 않게 해요
+
+/* ============ 이야기 데이터 ============ */
+const BILLY_SCENES = {
+  s1:{place:'Front Gate',emo:'🌧️🏚️🌲',prog:1,
+    en:"It's a stormy night. Bad luck! Billy is lost. He sees an old house and a dark forest.",
+    ko:"폭풍우 치는 밤, Billy가 길을 잃었어요. 낡은 집과 어두운 숲이 보여요.",
+    c:[{f:"I'm going to go to the house.",p:"Billy went to the house.",to:'s2'},
+       {f:"I'm going to go to the forest.",p:"Billy went to the forest.",to:'T_wolf'}]},
+  s2:{place:'Front Door',emo:'🚪🔒',prog:2,
+    en:"The front door is locked. There is a garden next to the house. There is also a high wall.",
+    ko:"현관문이 잠겨 있어요. 집 옆에 정원이 있고, 높은 담도 있어요.",
+    c:[{f:"I'm going to climb the wall.",p:"Billy climbed the wall.",to:'T_wall'},
+       {f:"I'm going to go to the garden.",p:"Billy went to the garden.",to:'s3'}]},
+  s3:{place:'Garden',emo:'🌿🪴',prog:3,
+    en:"In the garden, there is an old well and a big flower pot.",
+    ko:"정원에 오래된 우물과 커다란 화분이 있어요.",
+    c:[{f:"I'm going to look under the flower pot.",p:"Billy looked under the flower pot.",to:'s4'},
+       {f:"I'm going to look into the well.",p:"Billy looked into the well.",to:'T_well'}]},
+  s4:{place:'Entry Hall',emo:'🗝️🕰️',prog:4,
+    en:"Billy finds a key under the pot and opens the door! He is in the Entry Hall. A big clock talks: \"Say the magic word!\"",
+    ko:"화분 밑에서 열쇠를 찾아 문을 열었어요! 현관 홀이에요. 커다란 시계가 말해요. “마법의 말을 해!”",
+    c:[{f:"I'm going to say \"open.\"",p:"Billy said \"open.\"",to:'T_clock'},
+       {f:"I'm going to say \"please.\"",p:"Billy said \"please.\"",to:'s5'}]},
+  s5:{place:'Two Doors',emo:'🟦🚪🟥',prog:5,
+    en:"The clock smiles. \"Good boy!\" Now Billy sees a blue door and a red door.",
+    ko:"시계가 웃어요. 이제 파란 문과 빨간 문이 보여요.",
+    c:[{f:"I'm going to go through the blue door.",p:"Billy went through the blue door.",to:'s6'},
+       {f:"I'm going to go through the red door.",p:"Billy went through the red door.",to:'d1'}]},
+  d1:{place:'Dining Room',emo:'🍗🐈‍⬛',prog:5,
+    en:"It's a dining room. There is a lot of food on the table. A black cat is sitting on a chair.",
+    ko:"식당이에요. 식탁 위에 음식이 가득하고, 검은 고양이가 의자에 앉아 있어요.",
+    c:[{f:"I'm going to eat the food.",p:"Billy ate the food.",to:'T_pig'},
+       {f:"I'm going to talk to the cat.",p:"Billy talked to the cat.",to:'s6'}]},
+  s6:{place:'Library',emo:'📚✨',prog:6,
+    en:"Billy is in the library. There are many old books. One book is glowing.",
+    ko:"도서관이에요. 오래된 책이 가득하고, 책 한 권이 반짝이고 있어요.",
+    c:[{f:"I'm going to read the glowing book.",p:"Billy read the glowing book.",to:'T_frog'},
+       {f:"I'm going to look for a secret door.",p:"Billy looked for a secret door.",to:'s7'}]},
+  s7:{place:'Bookshelf',emo:'🗄️🪟',prog:7,
+    en:"Billy finds a secret door behind a bookshelf! There is also an open window.",
+    ko:"책장 뒤에 비밀 문이 있어요! 열린 창문도 하나 있어요.",
+    c:[{f:"I'm going to move the bookshelf.",p:"Billy moved the bookshelf.",to:'s8'},
+       {f:"I'm going to jump out the window.",p:"Billy jumped out the window.",to:'T_thorn'}]},
+  s8:{place:'Hallway',emo:'🕯️👣',prog:8,
+    en:"Billy is in a long, dark hallway. He hears footsteps behind him!",
+    ko:"길고 어두운 복도예요. 뒤에서 발소리가 들려요!",
+    c:[{f:"I'm going to look back.",p:"Billy looked back.",to:'T_shadow'},
+       {f:"I'm going to walk slowly.",p:"Billy walked slowly.",to:'s9'}]},
+  s9:{place:'Ghost Girl',emo:'👧👻',prog:9,
+    en:"At the end of the hallway, a little ghost girl is crying.",
+    ko:"복도 끝에서 작은 유령 소녀가 울고 있어요.",
+    c:[{f:"I'm going to talk to the ghost girl.",p:"Billy talked to the ghost girl.",to:'s10'},
+       {f:"I'm going to run away.",p:"Billy ran away.",to:'T_stairs'}]},
+  s10:{place:'Kitchen',emo:'🍪🍪🍪',prog:10,
+    en:"The ghost girl smiles and gives Billy a candle. \"Go to the kitchen,\" she says. In the kitchen, there are cookies on the table. They smell so good!",
+    ko:"유령 소녀가 웃으며 촛불을 줘요. “부엌으로 가.” 부엌 식탁 위에 쿠키가 있어요. 냄새가 너무 좋아요!",
+    c:[{f:"I'm going to eat the cookies.",p:"Billy ate the cookies.",to:'T_cookie'},
+       {f:"I'm not going to eat the cookies.",p:"Billy didn't eat the cookies.",to:'s11'}]},
+  s11:{place:'Kitchen',emo:'🧊🚪',prog:11,
+    en:"Billy puts the cookies in his pocket. There is a big fridge and a door to the basement.",
+    ko:"Billy는 쿠키를 주머니에 넣었어요. 큰 냉장고와 지하실로 가는 문이 있어요.",
+    c:[{f:"I'm going to open the fridge.",p:"Billy opened the fridge.",to:'T_fridge'},
+       {f:"I'm going to go to the basement.",p:"Billy went to the basement.",to:'s12'}]},
+  s12:{place:'Basement',emo:'🕯️🗺️',prog:12,
+    en:"It's very dark in the basement. Billy lights the candle. He sees a map on the wall and a dark tunnel.",
+    ko:"지하실은 아주 어두워요. 촛불을 켜니 벽에 붙은 지도와 어두운 터널이 보여요.",
+    c:[{f:"I'm going to go into the dark tunnel.",p:"Billy went into the dark tunnel.",to:'T_bat'},
+       {f:"I'm going to look at the map.",p:"Billy looked at the map.",to:'s13'}]},
+  s13:{place:'The Hole',emo:'🕳️🌉',prog:13,
+    en:"The map shows the way out. But there is a big hole in the floor! There is an old, broken bridge over it.",
+    ko:"지도에 나가는 길이 있어요. 그런데 바닥에 큰 구멍이! 그 위에 낡고 부서진 다리가 있어요.",
+    c:[{f:"I'm going to jump over the hole.",p:"Billy jumped over the hole.",to:'s14'},
+       {f:"I'm going to walk on the broken bridge.",p:"Billy walked on the broken bridge.",to:'T_bridge'}]},
+  s14:{place:'Exit Door',emo:'🚪🕷️',prog:14,
+    en:"Billy sees the exit door! But a giant spider is in front of the door. It looks very hungry.",
+    ko:"출구가 보여요! 그런데 문 앞에 커다란 거미가 있어요. 아주 배고파 보여요.",
+    c:[{f:"I'm going to fight the spider.",p:"Billy fought the spider.",to:'T_spider'},
+       {f:"I'm going to give the cookies to the spider.",p:"Billy gave the cookies to the spider.",to:'ESC'}]},
+};
+const BILLY_TRAPS = {
+  T_wolf:{e:'🐺',n:'늑대 숲',en:"Wolves come out of the forest! Billy can't run fast enough."},
+  T_wall:{e:'🧱',n:'무너지는 담',en:"The old wall falls down... right on Billy!"},
+  T_well:{e:'🕳️',n:'깊은 우물',en:"Billy looks into the well... and falls in! Splash!"},
+  T_clock:{e:'🕰️',n:'화난 시계',en:"\"Wrong word!\" The clock gets angry. Its long hands grab Billy."},
+  T_pig:{e:'🐷',n:'마법 음식',en:"The food is magic. Billy turns into a pig! Oink!"},
+  T_frog:{e:'🐸',n:'개구리 책',en:"The book flashes. Billy turns into a frog! Ribbit!"},
+  T_thorn:{e:'🌵',n:'가시덤불',en:"Billy jumps into a big thorn bush. Ouch!"},
+  T_shadow:{e:'👻',n:'그림자 유령',en:"Billy looks back. A shadow ghost catches him! Boo!"},
+  T_stairs:{e:'🪜',n:'부서진 계단',en:"Billy runs in the dark and falls down the stairs."},
+  T_cookie:{e:'🍪',n:'잠드는 쿠키',en:"The cookies are magic. Billy falls asleep... for 100 years!"},
+  T_fridge:{e:'🧊',n:'냉장고 괴물',en:"A fridge monster jumps out! Brrr!"},
+  T_bat:{e:'🦇',n:'박쥐 터널',en:"Hundreds of bats fly out of the tunnel!"},
+  T_bridge:{e:'🌉',n:'끊어진 다리',en:"Crack! The bridge breaks. Billy falls into the hole."},
+  T_spider:{e:'🕷️',n:'거대 거미',en:"The spider is too strong. Billy is caught in its web!"},
+};
+
+/* How often 건강 습관 편: 각 선택지의 t = 눌러서 넣는 조각 (문장 맨 앞이나 맨 끝) */
+const HABIT_SCENES = {
+  h1:{place:'Couch Gate',emo:'🎮🛋️🏰',prog:1,
+    en:"Billy plays video games all day. Suddenly, he falls into the game! He is at the gate of the Couch Potato Kingdom. A guard asks, \"How often do you exercise?\"",
+    ko:"하루 종일 게임만 하던 Billy가 게임 속으로 빨려 들어갔어요! 게으름뱅이 왕국의 문 앞이에요. 문지기가 물어요. “너는 얼마나 자주 운동하니?”",
+    c:[{f:"I exercise three times a week.",t:"three times a week",p:"나는 일주일에 세 번 운동해.",to:'h2'},
+       {f:"I exercise once a year.",t:"once a year",p:"나는 일 년에 한 번 운동해.",to:'H_potato'}]},
+  h2:{place:'Snack Street',emo:'🍭🥕',prog:2,
+    en:"Inside the gate, there are snack shops everywhere. A candy seller smiles. \"Have some candy!\" Next to him, a farmer is selling fresh vegetables.",
+    ko:"문 안에는 과자 가게가 가득해요. 사탕 장수가 웃으며 “사탕 먹어!” 해요. 그 옆에서 농부가 신선한 채소를 팔고 있어요.",
+    c:[{f:"I eat candy every day.",t:"every day",p:"나는 매일 사탕을 먹어.",to:'H_sugar'},
+       {f:"I eat fresh vegetables every day.",t:"every day",p:"나는 매일 신선한 채소를 먹어.",to:'h3'}]},
+  h3:{place:'Farmer',emo:'👩‍🌾🥦',prog:3,
+    en:"The farmer is happy. \"Good for you!\" she says. Billy wants to know about her habits, too. What does Billy ask her?",
+    ko:"농부가 기뻐하며 “잘하고 있네!” 해요. Billy도 농부의 습관이 궁금해요. Billy는 뭐라고 물어볼까요?",
+    c:[{f:"How often do you eat vegetables?",t:"How often",p:"너는 채소를 얼마나 자주 먹니?",to:'h4'},
+       {f:"How often do you eat junk food?",t:"How often",p:"너는 정크푸드를 얼마나 자주 먹니?",to:'H_tomato'}]},
+  h4:{place:'Fountain',emo:'⛲🧚',prog:4,
+    en:"\"Once a day!\" says the farmer, and she gives Billy a carrot. Billy walks to a big fountain. A water fairy asks, \"How often do you drink water?\"",
+    ko:"농부가 “하루에 한 번!” 하며 당근을 줘요. 큰 분수에 가니 물의 요정이 물어요. “너는 얼마나 자주 물을 마시니?”",
+    c:[{f:"I drink water twice a day.",t:"twice a day",p:"나는 하루에 두 번 물을 마셔.",to:'h5'},
+       {f:"I drink soda twice a day.",t:"twice a day",p:"나는 하루에 두 번 탄산음료를 마셔.",to:'H_soda'}]},
+  h5:{place:'Toothbrush Bridge',emo:'🪥🤖',prog:5,
+    en:"The fairy opens a bridge. On the bridge, there is a giant toothbrush. A dentist robot asks, \"How often do you brush your teeth?\"",
+    ko:"요정이 다리를 열어 줘요. 다리 위에 거대한 칫솔이 있어요. 치과 로봇이 물어요. “너는 얼마나 자주 이를 닦니?”",
+    c:[{f:"I brush my teeth once a week.",t:"once a week",p:"나는 일주일에 한 번 이를 닦아.",to:'H_cavity'},
+       {f:"I brush my teeth three times a day.",t:"three times a day",p:"나는 하루에 세 번 이를 닦아.",to:'h6'}]},
+  h6:{place:'Lazy Lion',emo:'🦁💤',prog:6,
+    en:"After the bridge, Billy meets a lazy lion. The lion lies on a sofa all day. He can't run anymore! Billy wants to help him.",
+    ko:"다리를 건너니 게으른 사자가 있어요. 하루 종일 소파에 누워 있어서 이제 달리지도 못해요! Billy가 도와주고 싶어요.",
+    c:[{f:"You should exercise more often.",t:"more often",p:"너는 더 자주 운동해야 해.",to:'h7'},
+       {f:"You should sleep more often.",t:"more often",p:"너는 더 자주 자야 해.",to:'H_lion'}]},
+  h7:{place:'Gym Hall',emo:'🏋️🪢',prog:7,
+    en:"The lion jumps up and runs with Billy to the Gym Hall. A big jump rope talks: \"How often do you jump rope?\"",
+    ko:"사자가 벌떡 일어나 Billy와 함께 체육관으로 달려가요. 커다란 줄넘기가 말해요. “너는 얼마나 자주 줄넘기를 하니?”",
+    c:[{f:"I jump rope once a month.",t:"once a month",p:"나는 한 달에 한 번 줄넘기를 해.",to:'H_rope'},
+       {f:"I jump rope four times a week.",t:"four times a week",p:"나는 일주일에 네 번 줄넘기를 해.",to:'h8'}]},
+  h8:{place:'Magic Mirror',emo:'🪞✨',prog:8,
+    en:"A magic mirror talks to Billy. \"Look at yourself. What do you need to do?\"",
+    ko:"마법 거울이 말해요. “너 자신을 봐. 무엇을 해야 할까?”",
+    c:[{f:"I should eat vegetables more often.",t:"more often",p:"나는 채소를 더 자주 먹어야 해.",to:'h9'},
+       {f:"I should play games more often.",t:"more often",p:"나는 게임을 더 자주 해야 해.",to:'H_mirror'}]},
+  h9:{place:'Sleepy Tower',emo:'🦉🌙',prog:9,
+    en:"Billy climbs the Sleepy Tower. A wise old owl lives there. Billy wants to learn the owl's good habits. What does Billy ask?",
+    ko:"Billy가 졸음 탑에 올라가요. 지혜로운 부엉이가 살고 있어요. Billy는 부엉이의 좋은 습관이 궁금해요. 뭐라고 물어볼까요?",
+    c:[{f:"How often do you go to bed early?",t:"How often",p:"너는 얼마나 자주 일찍 자니?",to:'h10'},
+       {f:"How often do you stay up late?",t:"How often",p:"너는 얼마나 자주 늦게까지 안 자니?",to:'H_owl'}]},
+  h10:{place:'Throne Room',emo:'👑🛋️',prog:10,
+    en:"\"Every night!\" says the owl, and she shows Billy the way. Billy reaches the throne room. King Couch sits on a giant sofa. \"Kids don't need good habits!\" he shouts.",
+    ko:"부엉이가 “매일 밤!” 하고 길을 알려 줘요. 왕좌의 방에 도착! 소파 왕이 거대한 소파에 앉아 소리쳐요. “아이들에게 좋은 습관은 필요 없어!”",
+    c:[{f:"We need good habits for a healthy life.",t:"for a healthy life",p:"건강한 삶을 위해 좋은 습관이 필요해.",to:'h11'},
+       {f:"We need more snacks for a happy life.",t:"for a happy life",p:"행복한 삶을 위해 간식이 더 필요해.",to:'H_king'}]},
+  h11:{place:'Exit Door',emo:'🚪🌈',prog:11,
+    en:"King Couch's sofa breaks into pieces! A shining exit door appears. To open it, Billy must say the magic words.",
+    ko:"소파 왕의 소파가 산산조각 났어요! 빛나는 출구가 나타났어요. 문을 열려면 마법의 말을 해야 해요.",
+    c:[{f:"Lazy habits make a happy life!",t:"Lazy habits",p:"게으른 습관이 행복한 삶을 만들어!",to:'H_door'},
+       {f:"Healthy habits make a healthy life!",t:"Healthy habits",p:"건강한 습관이 건강한 삶을 만들어!",to:'ESC'}]},
+};
+const HABIT_TRAPS = {
+  H_potato:{e:'🥔',n:'카우치 포테이토',en:"\"Welcome, friend!\" Poof! Billy turns into a couch potato."},
+  H_sugar:{e:'🍭',n:'설탕 괴물',en:"A sugar monster jumps out of the candy shop and grabs Billy!"},
+  H_tomato:{e:'🍅',n:'화난 농부',en:"\"Junk food? Never!\" The farmer throws tomatoes at Billy. Splat!"},
+  H_soda:{e:'🥤',n:'탄산 파도',en:"A big wave of fizzy soda washes Billy away!"},
+  H_cavity:{e:'🦷',n:'충치 벌레',en:"Cavity bugs attack Billy's teeth. Ouch, ouch, ouch!"},
+  H_lion:{e:'🦁',n:'졸린 사자',en:"The lion yawns... and falls asleep on top of Billy!"},
+  H_rope:{e:'🪢',n:'꼬인 줄넘기',en:"The jump rope gets angry and ties Billy up!"},
+  H_mirror:{e:'🪞',n:'게임 거울',en:"Billy gets sucked into the mirror... and plays games forever!"},
+  H_owl:{e:'🦉',n:'올빼미 소리',en:"\"Every night!\" The owl hoots so loudly that Billy falls off the tower."},
+  H_king:{e:'👑',n:'소파 왕',en:"King Couch laughs. \"Yes! Stay on my sofa forever!\" Billy can't get up."},
+  H_door:{e:'🚪',n:'과자 눈사태',en:"The door opens... and a mountain of snacks falls on Billy!"},
+};
+
+const STORIES = {
+  billy: { id:'billy', mode:'going', title:'Stay Alive: Bad Luck Billy', short:'Bad Luck Billy', tagline:"유령 저택 방탈출 · I'm going to ~",
+    emo:'🏚️', introEmo:'⛈️🏚️', winLine:'Billy stayed alive!', winEmo:'🎉🏃‍♂️🚪',
+    hook:'🏚️ Billy가 유령 저택에 갇혔어요! 무사히 탈출시켜요.', waitLine:'선생님이 시작하면 유령 저택에 들어가요.',
+    start:'s1', checkpoints:{ s4:'Entry Hall', s8:'Hallway', s12:'Basement' }, maxProg:14,
+    order:['s1','s2','s3','s4','s5','d1','s6','s7','s8','s9','s10','s11','s12','s13','s14'],
+    scenes:BILLY_SCENES, traps:BILLY_TRAPS,
+    intro:{ en:"Billy is the unluckiest boy in town. Tonight, he is lost in a storm... and the only place to go is a haunted house. Help Billy make good choices and get out alive!",
+            ko:"Billy는 동네에서 제일 운 없는 아이예요. 오늘 밤 폭풍 속에서 길을 잃었는데, 갈 곳은 유령 저택뿐! Billy가 좋은 선택을 해서 살아서 나오도록 도와주세요." },
+    esc:"The spider eats the cookies and falls asleep. Billy opens the door and runs out. He is free!",
+    cardF:"I'm going to 문장 (기본)", cardP:'과거형 문장 (어려움: 바꿔 쓰기)', chipF:"I'm going to 문장", chipP:'과거형 → 바꿔 쓰기',
+    cardHelp:'기본: <span class="slab">I\'m going to go to the garden.</span>을 보고 옮겨 써요. 어려움: <span class="slab">Billy went to the garden.</span>을 보고 I\'m going to 문장으로 바꿔 써요.',
+    tileHelp:"조각(I'm going to)은 매번 직접 눌러요.", shortest:'가장 짧은 탈출 길은 문장 14개예요. 처음 하는 반은 20분 이상을 권해요.',
+    howTiles:'조각 <span class="tile" style="font-size:.9rem">I\'m</span> <span class="tile" style="font-size:.9rem">going</span> <span class="tile" style="font-size:.9rem">to</span> 를 <b>순서대로</b> 누르고,',
+    pracHidden:"I'm going to … ?", pracAsk:"🗣️ Billy가 되어 I'm going to ~ 로 바꿔 말해 볼까요?",
+    pLabel:'과거형 (어려움 모드용)', storyKey:'story' },
+  habits: { id:'habits', mode:'chunk', title:"Billy's Healthy Habits", short:'Healthy Habits', tagline:'게으름뱅이 왕국 탈출 · How often ~?',
+    emo:'🛋️', introEmo:'🎮🌀🏰', winLine:'Healthy habits win!', winEmo:'🎉🥦🏃‍♂️',
+    hook:'🛋️ Billy가 게으름뱅이 왕국에 갇혔어요! 건강한 습관으로 탈출시켜요.', waitLine:'선생님이 시작하면 게임 속 왕국으로 들어가요.',
+    start:'h1', checkpoints:{ h4:'Fountain', h7:'Gym Hall', h10:'Throne Room' }, maxProg:11,
+    order:['h1','h2','h3','h4','h5','h6','h7','h8','h9','h10','h11'],
+    scenes:HABIT_SCENES, traps:HABIT_TRAPS,
+    intro:{ en:"Billy plays video games all day and never moves. One day, he falls into his game! Now he is stuck in the Couch Potato Kingdom. Only healthy habits can get him out!",
+            ko:"Billy는 하루 종일 게임만 하고 움직이지 않아요. 그러다 게임 속으로 빨려 들어가 게으름뱅이 왕국에 갇혔어요! 건강한 습관만이 Billy를 구할 수 있어요." },
+    esc:"The door opens and Billy jumps out of the game. He turns off the computer and goes outside to play. Healthy habits make a healthy life!",
+    cardF:'영어 문장 (기본)', cardP:'한국어 문장 (어려움: 영어로 쓰기)', chipF:'영어 문장', chipP:'한국어 → 영어로 쓰기',
+    cardHelp:'기본: <span class="slab">I drink water twice a day.</span>를 보고 옮겨 써요. 어려움: <span class="slab">나는 하루에 두 번 물을 마셔.</span>를 보고 영어로 써요.',
+    tileHelp:'빈도 조각(twice a day, How often …)은 매번 직접 눌러요.', shortest:'가장 짧은 탈출 길은 문장 11개예요. 처음 하는 반은 15분 이상을 권해요.',
+    howTiles:'빈도 조각 <span class="tile" style="font-size:.9rem">twice</span> <span class="tile" style="font-size:.9rem">a</span> <span class="tile" style="font-size:.9rem">day</span> 나 <span class="tile" style="font-size:.9rem">How</span> <span class="tile" style="font-size:.9rem">often</span> 를 <b>골라 순서대로</b> 누르고,',
+    pracHidden:'… ?', pracAsk:'🗣️ 영어로 말해 볼까요?',
+    pLabel:'한국어 뜻 (어려움 모드용)', storyKey:'story-habits' },
+};
+let CUR = null, START, CHECKPOINTS, MAXPROG, SCENES, TRAPS, TRAP_IDS, SCENE_ORDER, BASE_SCENES, INTRO_EN, INTRO_KO, ESC_EN;
+let STORY = {};   // 선생님이 고친 문장 { 장면id: { en, ko, c: [{f,p,t},{f,p,t}] } }
+function useStory(id){
+  const d = STORIES[id] || STORIES.billy;
+  if (CUR && CUR.id === d.id) return;
+  CUR = d; START = d.start; CHECKPOINTS = d.checkpoints; MAXPROG = d.maxProg; SCENE_ORDER = d.order;
+  SCENES = JSON.parse(JSON.stringify(d.scenes)); BASE_SCENES = JSON.parse(JSON.stringify(d.scenes));
+  TRAPS = d.traps; TRAP_IDS = Object.keys(TRAPS); INTRO_EN = d.intro.en; INTRO_KO = d.intro.ko; ESC_EN = d.esc; STORY = {};
+}
+function applyStory(ov){
+  STORY = ov && typeof ov === 'object' ? ov : {};
+  for (const id in BASE_SCENES) {
+    const b = BASE_SCENES[id], o = STORY[id] || {};
+    SCENES[id].en = o.en || b.en; SCENES[id].ko = o.ko ?? b.ko;
+    SCENES[id].c = b.c.map((c, i) => ({ ...c, f: o.c?.[i]?.f || c.f, p: o.c?.[i]?.p || c.p, t: o.c?.[i]?.t || c.t }));
+  }
+}
+useStory('billy');
+const fixApos = t => String(t || '').replace(/[’‘`´]/g, "'").replace(/\s+/g, ' ').trim();
+const STORY_PATH = () => `${ROOT}/${PREFIX}${CUR.storyKey}`;
+
+/* ============ 공통 도구 ============ */
+const $ = s => document.querySelector(s);
+const app = $('#app'), ovEl = $('#ov'), toastEl = $('#toast');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const params = new URLSearchParams(location.search);
+const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+function hash(s){ let h = 5381; for (const ch of s) h = ((h << 5) + h + ch.codePointAt(0)) >>> 0; return 'p' + h.toString(36); }
+function fmtDur(ms){ if (ms == null) return '-'; const t = Math.max(0, Math.round(ms / 1000)), m = Math.floor(t / 60); return m ? `${m}분 ${String(t % 60).padStart(2, '0')}초` : `${t}초`; }
+function fmtClock(ms){ const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; }
+const pct = x => x == null ? '-' : Math.round(x * 100) + '%';
+
+const ACT = {};
+document.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (!el) return; const f = ACT[el.dataset.act]; if (f) { e.preventDefault(); f(el.dataset.arg, el, e); } });
+
+/* 채점 */
+function norm(s){ return String(s).toLowerCase().replace(/[’‘`´]/g, "'").replace(/[^a-z0-9' ]+/g, ' ').replace(/'/g, '').replace(/\s+/g, ' ').trim(); }
+function toks(s){ return String(s).trim().split(/\s+/).map(r => ({ raw: r, n: norm(r) === 'okay' ? 'ok' : norm(r).replace(/\s+/g, '') })).filter(t => t.n); }
+function splitChoice(c){
+  const f = fixApos(typeof c === 'string' ? c : c.f), t = typeof c === 'object' && c.t ? fixApos(c.t) : '';
+  if (!t) { const m = f.match(/^I'm (not )?going to (.*)$/); if (m) return { tiles: m[1] ? ["I'm", 'not', 'going', 'to'] : ["I'm", 'going', 'to'], rest: m[2], pos: 'head' }; return { tiles: [], rest: f, pos: 'head' }; }
+  if (f.toLowerCase().startsWith(t.toLowerCase() + ' ')) return { tiles: f.slice(0, t.length).split(' '), rest: f.slice(t.length).trim(), pos: 'head' };
+  const body = f.replace(/[.!?]+$/, '').trim();
+  if (body.toLowerCase().endsWith(' ' + t.toLowerCase())) return { tiles: body.slice(body.length - t.length).split(' '), rest: body.slice(0, body.length - t.length).trim(), pos: 'tail' };
+  return { tiles: [], rest: f, pos: 'head' };
+}
+function stripPrefix(arr){ const w = arr.map(t => t.n); const pres = [['im','not','going','to'],['i','am','not','going','to'],['im','going','to'],['i','am','going','to'],['im','gonna'],['im','not','gonna']]; for (const p of pres) if (p.every((x, i) => w[i] === x)) return arr.slice(p.length); return arr; }
+function diffWords(exp, got){
+  const n = exp.length, m = got.length, L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = exp[i] === got[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  let i = 0, j = 0, ge = [], gg = []; const bad = new Array(m).fill(false), pairs = [];
+  const flush = () => { const k = Math.max(ge.length, gg.length); for (let x = 0; x < k; x++) pairs.push({ e: ge[x] ?? '', g: gg[x] ?? '' }); ge = []; gg = []; };
+  while (i < n || j < m) {
+    if (i < n && j < m && exp[i] === got[j]) { flush(); i++; j++; }
+    else if (j < m && (i >= n || L[i][j + 1] >= L[i + 1][j])) { bad[j] = true; gg.push(got[j]); j++; }
+    else { ge.push(exp[i]); i++; }
+  }
+  flush();
+  return { ok: pairs.length === 0, bad, pairs };
+}
+function stripChunk(gotT, ex){
+  const cw = ex.tiles.map(t => norm(t)).filter(Boolean), w = gotT.map(t => t.n);
+  if (!cw.length || w.length <= cw.length) return gotT;
+  if (ex.pos === 'head' && cw.every((x, i) => w[i] === x)) return gotT.slice(cw.length);
+  if (ex.pos === 'tail' && cw.every((x, i) => w[w.length - cw.length + i] === x)) return gotT.slice(0, w.length - cw.length);
+  return gotT;
+}
+function grade(choice, tiles, typed){
+  const ex = splitChoice(choice);
+  const expT = toks(ex.rest);
+  let gotT = toks(typed);
+  if (typeof choice === 'object' && choice.t) gotT = stripChunk(gotT, ex);
+  else if (!/^(i'm|i am)\\b/i.test(ex.rest)) gotT = stripPrefix(gotT);
+  const d = diffWords(expT.map(t => t.n), gotT.map(t => t.n));
+  const tilesOk = tiles.length === ex.tiles.length && tiles.every((t, i) => norm(t) === norm(ex.tiles[i]));
+  const tileBad = tiles.map((t, i) => norm(t) !== norm(ex.tiles[i] || ''));
+  return { ok: tilesOk && d.ok, tilesOk, tileBad, words: gotT.map((t, i) => ({ w: t.raw, bad: d.bad[i] })), pairs: d.pairs.filter(p => p.e), missing: d.pairs.some(p => p.e && !p.g), expTiles: ex.tiles, pos: ex.pos };
+}
+
+/* 금칙어 */
+const BAN = ['씨발','시발','씨바','씨빨','ㅅㅂ','ㅆㅂ','병신','븅신','ㅂㅅ','개새','개세','새끼','좆','존나','졸라','지랄','ㅈㄹ','미친','미쳤','닥쳐','꺼져','엿먹','니애미','느금','애미','애비','섹스','야동','fuck','shit','bitch','sex','dick','porn'];
+function isBanned(name, extra){ const t = name.toLowerCase().replace(/[\s\d._\-~!@#$%^&*()+=,?/\\|'"`:;<>\[\]{}]/g, ''); return [...BAN, ...(extra || [])].some(w => { w = String(w).toLowerCase().replace(/\s/g, ''); return w && t.includes(w); }); }
+
+/* 소리 */
+let AC = null;
+function ac(){ try { AC ??= new (window.AudioContext || window.webkitAudioContext)(); if (AC.state === 'suspended') AC.resume(); return AC; } catch (e) { return null; } }
+function tone(f, t, d, type = 'sine', v = .2, f2){ const a = ac(); if (!a) return; const s = a.currentTime + t, o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.setValueAtTime(f, s); if (f2) o.frequency.exponentialRampToValueAtTime(f2, s + d); g.gain.setValueAtTime(1e-4, s); g.gain.exponentialRampToValueAtTime(v, s + .02); g.gain.exponentialRampToValueAtTime(1e-4, s + d); o.connect(g).connect(a.destination); o.start(s); o.stop(s + d + .05); }
+function sfx(k, on = true){ if (!on) return; switch (k) {
+  case 'tap': tone(660, 0, .06, 'triangle', .08); break;
+  case 'ok': tone(660, 0, .12, 'triangle', .18); tone(990, .1, .22, 'triangle', .18); break;
+  case 'wrong': tone(180, 0, .18, 'square', .07); tone(140, .16, .28, 'square', .07); break;
+  case 'death': tone(392, 0, .35, 'sawtooth', .09, 370); tone(370, .35, .35, 'sawtooth', .09, 349); tone(349, .7, .35, 'sawtooth', .09, 330); tone(330, 1.05, .9, 'sawtooth', .09, 220); tone(70, 1.05, .5, 'sine', .35, 40); break;
+  case 'win': [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .12, .25, 'triangle', .18)); tone(1047, .5, .7, 'triangle', .16); tone(1319, .5, .7, 'sine', .1); break;
+  case 'flag': tone(523, 0, .15, 'triangle', .15); tone(784, .12, .3, 'triangle', .15); break;
+} }
+let bgmTimer = null;
+function bgmStart(){ const a = ac(); if (!a || bgmTimer) return; const notes = [45, 48, 52, 51, 45, 48, 53, 52, 45, 48, 52, 51, 50, 48, 47, 44]; let i = 0, t = a.currentTime + .1;
+  bgmTimer = setInterval(() => { while (t < a.currentTime + .6) { const n = notes[i % notes.length], f = 440 * 2 ** ((n - 69) / 12), off = t - a.currentTime; tone(f, off, 1.2, 'triangle', .045); if (i % 2 === 0) tone(f / 2, off, 1.4, 'sine', .05); if (i % 4 === 3) tone(f * 3, off + .3, .4, 'sine', .012); t += .6; i++; } }, 150); }
+function bgmStop(){ clearInterval(bgmTimer); bgmTimer = null; }
+function speak(text){ try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = .9; speechSynthesis.speak(u); } catch (e) {} }
+
+/* ============ Firebase (라이브러리 없이 REST + 실시간 스트림으로 직접 연결) ============ */
+let db = null, serverOffset = 0;
+const TS = { '.sv': 'timestamp' };
+const now = () => Date.now() + serverOffset;
+const fbBase = DB_URL.replace(/\/+$/, '');
+const pjoin = (...p) => p.join('/').split('/').filter(Boolean).join('/');
+const fbUrl = p => `${fbBase}/${p}.json`;
+function snapOf(v, key){ return { val: () => v ?? null, exists: () => v != null, key }; }
+function setAt(root, parts, val){
+  if (!parts.length) return val ?? null;
+  const out = (root && typeof root === 'object') ? { ...root } : {};
+  const [k, ...rest] = parts;
+  const v = setAt(out[k], rest, val);
+  if (v == null || (typeof v === 'object' && !Object.keys(v).length)) delete out[k]; else out[k] = v;
+  return out;
+}
+async function fbFetch(path, method = 'GET', body, headers = {}){
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fetch(fbUrl(path), { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+      if (r.status === 412) return r;
+      if (!r.ok) { const t = await r.text(); throw new Error(`Firebase ${r.status}: ${t.slice(0, 120)}`); }
+      return r;
+    } catch (e) { if (i === 2 || /Firebase 4\d\d/.test(e.message)) throw e; await new Promise(res => setTimeout(res, 400 * (i + 1))); }
+  }
+}
+class FbRef {
+  constructor(path){ this.path = pjoin(path); this.key = this.path.split('/').pop(); }
+  child(p){ return new FbRef(pjoin(this.path, p)); }
+  async get(){ const r = await fbFetch(this.path); return snapOf(await r.json(), this.key); }
+  set(v){ return fbFetch(this.path, 'PUT', v); }
+  update(obj){ return fbFetch(this.path, 'PATCH', obj); }
+  remove(){ return fbFetch(this.path, 'DELETE'); }
+  push(v){ return fbFetch(this.path, 'POST', v); }
+  async transaction(fn){
+    for (let i = 0; i < 10; i++) {
+      const r = await fbFetch(this.path, 'GET', undefined, { 'X-Firebase-ETag': 'true' });
+      const etag = r.headers.get('ETag'), cur = await r.json(), nv = fn(cur);
+      if (!etag) { await this.set(nv); return { committed: true, snapshot: snapOf(nv, this.key) }; }
+      const w = await fbFetch(this.path, 'PUT', nv, { 'if-match': etag });
+      if (w.status !== 412) return { committed: true, snapshot: snapOf(await w.json(), this.key) };
+      await new Promise(res => setTimeout(res, 100 + Math.random() * 300));
+    }
+    throw new Error('transaction failed');
+  }
+  on(ev, cb){
+    let cache = null, es = null, closed = false, timer = null;
+    const open = () => {
+      if (closed) return;
+      es = new EventSource(fbUrl(this.path));
+      const apply = (e, patch) => {
+        let d; try { d = JSON.parse(e.data); } catch (x) { return; }
+        if (!d) return;
+        const parts = d.path.split('/').filter(Boolean);
+        if (patch) { for (const k in d.data) cache = setAt(cache, [...parts, ...k.split('/').filter(Boolean)], d.data[k]); }
+        else cache = setAt(cache, parts, d.data);
+        cb(snapOf(cache, this.key));
+      };
+      es.addEventListener('put', e => apply(e, false));
+      es.addEventListener('patch', e => apply(e, true));
+      es.addEventListener('cancel', () => { es.close(); });
+      es.onerror = () => { if (es.readyState === 2) { clearTimeout(timer); timer = setTimeout(open, 2000); } };
+    };
+    open();
+    return () => { closed = true; es && es.close(); };
+  }
+}
+function fbInit(){
+  if (typeof EventSource === 'undefined' || typeof fetch === 'undefined') { app.innerHTML = `<div class="wrap"><div class="panel"><h2>⚠️ 이 브라우저는 지원하지 않아요</h2><p>크롬·삼성 인터넷·사파리 최신 버전으로 열어 주세요.</p></div></div>`; return false; }
+  db = { ref: p => new FbRef(p) };
+  // 서버 시계 맞추기
+  (async () => { try { const t0 = Date.now(); const r = await fbFetch(`${ROOT}/${PREFIX}clock-${Math.random().toString(36).slice(2)}`, 'PUT', TS); const sv = await r.json(); const t1 = Date.now(); serverOffset = sv - (t0 + t1) / 2; fbFetch(r.url.replace(fbBase + '/', '').replace(/\.json$/, ''), 'DELETE').catch(() => {}); } catch (e) {} })();
+  return true;
+}
+const flatRoom = v => v ? { ...(v.meta || {}), players: v.players, miss: v.miss, feed: v.feed } : null;
+const roomPath = code => `${ROOT}/${PREFIX}${code}`;
+
+/* ============ 공통: 결과 계산 ============ */
+function playersArr(R){ return Object.entries(R?.players || {}).map(([pid, p]) => ({ pid, name: p.name, joined: p.joined || 0, st: p.st || {} })).sort((a, b) => a.joined - b.joined); }
+function rankList(ps){
+  return [...ps].sort((a, b) => {
+    const ea = a.st.escapedAt ? 1 : 0, eb = b.st.escapedAt ? 1 : 0;
+    if (ea !== eb) return eb - ea;
+    if (ea) return (a.st.order || 999) - (b.st.order || 999);
+    if ((b.st.maxProg || 0) !== (a.st.maxProg || 0)) return (b.st.maxProg || 0) - (a.st.maxProg || 0);
+    return (a.st.wrong || 0) - (b.st.wrong || 0);
+  });
+}
+function computeResults(R){
+  const ps = playersArr(R).filter(p => p.st.started), startAt = R.startAt || 0;
+  const esc = ps.filter(p => p.st.escapedAt).sort((a, b) => a.st.escapedAt - b.st.escapedAt);
+  const sum = k => ps.reduce((s, p) => s + (p.st[k] || 0), 0);
+  const correct = sum('correct'), wrong = sum('wrong'), deaths = sum('deaths');
+  const acc = correct + wrong ? correct / (correct + wrong) : null;
+  const fastest = esc[0] ? { p: esc[0], t: esc[0].st.escapedAt - startAt } : null;
+  const trapRank = TRAP_IDS.map(id => { let n = 0, who = 0; ps.forEach(p => { const c = p.st.traps?.[id] || 0; n += c; if (c) who++; }); return { id, n, who }; }).filter(x => x.n).sort((a, b) => b.n - a.n);
+  const missMap = {}; Object.values(R.miss || {}).forEach(m => { if (!m.e) return; (missMap[m.e] ??= { e: m.e, n: 0, g: {} }).n++; if (m.g) missMap[m.e].g[m.g] = (missMap[m.e].g[m.g] || 0) + 1; });
+  const misses = Object.values(missMap).sort((a, b) => b.n - a.n).slice(0, 10);
+  const accOf = p => (p.st.correct || 0) + (p.st.wrong || 0) ? (p.st.correct || 0) / ((p.st.correct || 0) + (p.st.wrong || 0)) : 0;
+  const best = (arr, f) => { if (!arr.length) return []; const mx = Math.max(...arr.map(f)); return mx > 0 ? arr.filter(p => f(p) === mx) : []; };
+  const awards = [];
+  const add = (icon, title, list, desc) => { if (list.length) awards.push({ icon, title, names: list.map(p => p.name), desc }); };
+  if (fastest) add('⚡', '번개 탈출', [fastest.p], fmtDur(fastest.t));
+  add('🎯', '정확왕', best(ps.filter(p => (p.st.correct || 0) >= 5), accOf), '틀린 문장이 가장 적은 비율');
+  add('😇', '한 번도 안 빠지고 탈출', esc.filter(p => !(p.st.deaths)), '함정 0번!');
+  add('🔥', '불사조', best(esc, p => p.st.deaths || 0), '가장 많이 빠지고도 탈출');
+  add('✍️', '문장왕', best(ps, p => p.st.correct || 0), '맞게 쓴 문장이 가장 많아요');
+  add('🃏', '함정 수집왕', best(ps, p => Object.keys(p.st.traps || {}).length), '가장 많은 함정 카드');
+  add('🎤', '또박또박 발음왕', best(ps, p => p.st.mic || 0), '말해서 가장 많이 썼어요');
+  add('🧗', '거의 다 왔어!', best(ps.filter(p => !p.st.escapedAt), p => p.st.maxProg || 0), '탈출 직전까지 갔어요');
+  return { ps, esc, correct, wrong, deaths, acc, fastest, trapRank, misses, awards, rank: rankList(ps) };
+}
+
+/* =====================================================================
+   교사 TV 화면
+   ===================================================================== */
+const DEF_SETTINGS = { story: 'billy', time: 20, card: 'future', known: 'tap', cp: true, sfx: true, mic: true, banned: '' };
+const tv = { code: null, ref: null, room: null, viewKey: null, slide: 0, sfx: true, bgm: false, detail: null, menu: false, qr: false, practice: null, seenEsc: null, toastTimer: null };
+
+function tvSetup(over){
+  let s = DEF_SETTINGS; try { s = { ...DEF_SETTINGS, ...JSON.parse(localStorage.getItem('sa_settings') || '{}') }; } catch (e) {}
+  if (over) s = { ...s, ...over };
+  useStory(s.story); const cps = Object.values(CHECKPOINTS).join(' · ');
+  const chips = (g, opts, cur) => opts.map(([v, l]) => `<span class="chip ${String(v) === String(cur) ? 'on' : ''}" data-act="chip" data-arg="${g}" data-val="${v}">${l}</span>`).join('');
+  app.innerHTML = `<div class="wrap">
+    <div class="center"><h1 class="creep" style="font-size:3.6rem;color:#fda4af">${esc(CUR.title)}</h1>
+    <div class="mute">${esc(CUR.tagline)} · 교사 화면</div></div>
+    <div class="panel" style="margin-top:16px">
+      <div class="grp"><div class="lbl">🏚️ 이야기</div>${Object.values(STORIES).map(d => `<span class="chip ${d.id === CUR.id ? 'on' : ''}" data-act="storyPick" data-arg="${d.id}">${esc(d.title)} <span class="small mute">· ${esc(d.tagline.split('·')[1] || '')}</span></span>`).join('')}</div>
+      <div class="grp"><div class="lbl">⌛ 제한 시간</div>${chips('time', [[10,'10분'],[15,'15분'],[20,'20분'],[25,'25분'],[30,'30분'],[40,'40분'],[0,'없음(직접 끝내기)']], s.time)}
+        <div class="hint">${CUR.shortest}</div></div>
+      <div class="grp"><div class="lbl">🃏 선택지에 보여 줄 문장</div>${chips('card', [['future', CUR.cardF],['past', CUR.cardP]], s.card)}
+        <div class="hint">${CUR.cardHelp}</div></div>
+      <div class="grp"><div class="lbl">✍️ 써 본 길을 다시 갈 때 (Game Over 뒤)</div>${chips('known', [['tap','눌러서 채우기 (기본)'],['ghost','흐린 글씨 보고 따라 쓰기'],['speak','🎤 말해서 채우기']], s.known)}
+        <div class="hint">써 봤던 카드를 누르면 도와줘요. ${CUR.tileHelp}</div></div>
+      <label class="toggle"><input type="checkbox" id="o_cp" ${s.cp ? 'checked' : ''}>🚩 체크포인트 (Game Over면 마지막 깃발 ${esc(cps)}에서 다시, 5초 대기)</label>
+      <label class="toggle"><input type="checkbox" id="o_sfx" ${s.sfx ? 'checked' : ''}>🔊 태블릿 효과음 (맞음·틀림·Game Over·탈출)</label>
+      <label class="toggle"><input type="checkbox" id="o_mic" ${s.mic ? 'checked' : ''}>🎤 말해서 쓰기 (음성인식 — 크롬·삼성 인터넷·사파리)</label>
+      <div class="grp"><div class="lbl">🚫 이름 금칙어 (쉼표로 구분)</div>
+        <input id="o_ban" value="${esc(s.banned)}" placeholder="예) 바보, 똥" style="width:100%;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text)">
+        <div class="hint">욕설·비속어는 기본으로 막아요(숫자·띄어쓰기를 끼워도). 여기에는 우리 반에서 더 막고 싶은 말을 넣어요.</div></div>
+      <div class="center" style="margin-top:18px"><button class="red" style="font-size:1.5rem;padding:.7em 2em" data-act="createRoom">수업 방 만들기</button>
+        <div style="margin-top:12px"><button class="ghost" data-act="edOpen">✏️ 문장 고치기</button> <span class="mute small" id="edInfo"></span></div></div>
+    </div></div>`;
+}
+ACT.storyPick = id => { const cur0 = readSettings(); tvSetup({ ...cur0, story: id }); loadSavedStory(); };
+ACT.chip = (g, el) => { document.querySelectorAll(`.chip[data-arg="${g}"]`).forEach(c => c.classList.remove('on')); el.classList.add('on'); };
+function readSettings(){
+  const v = g => document.querySelector(`.chip.on[data-arg="${g}"]`)?.dataset.val;
+  return { story: CUR.id, time: +v('time'), card: v('card'), known: v('known'), cp: $('#o_cp').checked, sfx: $('#o_sfx').checked, mic: $('#o_mic').checked, banned: $('#o_ban').value };
+}
+ACT.createRoom = async (a, el) => {
+  el.disabled = true; el.textContent = '방 만드는 중…';
+  const s = readSettings(); localStorage.setItem('sa_settings', JSON.stringify(s));
+  const settings = { ...s, banned: s.banned.split(',').map(x => x.trim()).filter(Boolean) };
+  try {
+    let code;
+    for (let i = 0; i < 30; i++) { code = String(Math.floor(1000 + Math.random() * 9000)); const v = (await db.ref(roomPath(code) + '/meta/created').get()).val(); if (!v || now() - v > 12 * 3600e3) break; }
+    await db.ref(roomPath(code)).set({ meta: { created: TS, status: 'lobby', settings, round: 1, escapeCount: 0, story: Object.keys(STORY).length ? STORY : null } });
+    location.href = location.pathname + '?tv=' + code;
+  } catch (e) { alert('방을 만들지 못했어요. 인터넷 연결을 확인해 주세요.\n' + e.message); el.disabled = false; el.textContent = '수업 방 만들기'; }
+};
+
+function studentURL(){ return location.origin + location.pathname + '?room=' + tv.code; }
+function makeQR(el, size){ if (!el) return; try { const q = qrcode(0, 'M'); q.addData(studentURL()); q.make(); const n = q.getModuleCount(); el.innerHTML = q.createSvgTag({ cellSize: Math.max(2, Math.floor(size / (n + 8))), margin: 4 }); const svg = el.querySelector('svg'); if (svg) { svg.style.width = size + 'px'; svg.style.height = size + 'px'; } } catch (e) { el.innerHTML = `<div style="color:#000;font-weight:900;padding:10px">${esc(studentURL())}</div>`; } }
+
+function tvStart(code){
+  tv.code = code; tv.ref = db.ref(roomPath(code));
+  tv.ref.on('value', s => { const v = s.val(); useStory(v?.meta?.settings?.story); applyStory(v?.meta?.story); tv.room = flatRoom(v); tvRender(); });
+  setInterval(tvTick, 500);
+  document.addEventListener('keydown', e => {
+    if (tv.practice) { if (['ArrowRight', ' ', 'PageDown', 'Enter'].includes(e.key)) { e.preventDefault(); ACT.pracNext(); } else if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); ACT.pracPrev(); } else if (e.key === 'Escape') ACT.pracClose(); return; }
+    if (tv.room?.status === 'end') { if (['ArrowRight', ' ', 'PageDown', 'Enter'].includes(e.key)) { e.preventDefault(); ACT.slideNext(); } else if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); ACT.slidePrev(); } }
+  });
+}
+function tvTick(){
+  const R = tv.room; if (!R) return;
+  const el = $('#timer');
+  if (R.status === 'play') {
+    if (R.endAt) { const left = R.endAt - now(); if (el) el.textContent = '⏳ ' + fmtClock(left); if (left <= 0 && !tv.ending) { tv.ending = true; tv.ref.update({ 'meta/status': 'end' }).finally(() => setTimeout(() => tv.ending = false, 3000)); } }
+    else if (el) el.textContent = '⏱️ ' + fmtClock(now() - (R.startAt || now())) + ' (제한 없음)';
+  }
+}
+function tvRender(){
+  const R = tv.room;
+  if (!R) { app.innerHTML = `<div class="wrap"><div class="panel"><h2>방이 없어요</h2><button class="red" data-act="newRoom">새 방 만들기</button></div></div>`; return; }
+  if (R.status !== tv.viewKey) { tv.viewKey = R.status; tv.slide = 0; tvBuild(R.status); }
+  const ps = playersArr(R);
+  // 탈출 알림
+  const escNow = ps.filter(p => p.st.escapedAt).map(p => p.pid);
+  if (tv.seenEsc === null) tv.seenEsc = new Set(escNow);
+  else escNow.forEach(pid => { if (!tv.seenEsc.has(pid)) { tv.seenEsc.add(pid); const p = ps.find(x => x.pid === pid); showToast(`🎉 ${esc(p.name)} 탈출!<div style="font-size:1.4rem;margin-top:6px">${p.st.order || ''}번째</div>`); sfx('win', tv.sfx); } });
+  if (R.status === 'lobby') tvUpdateLobby(R, ps);
+  else if (R.status === 'play') tvUpdateGame(R, ps);
+  else if (R.status === 'end') tvUpdateResults(R);
+  tvOverlays(R, ps);
+}
+function showToast(html){ toastEl.innerHTML = `<div class="toast">${html}</div>`; clearTimeout(tv.toastTimer); tv.toastTimer = setTimeout(() => toastEl.innerHTML = '', 3200); }
+function tvTopButtons(){ return `<button class="ghost" data-act="qr">📱 접속 QR</button><button class="ghost" data-act="bgm">${tv.bgm ? '🎵 음악 끄기' : '🎵 음악'}</button><button class="ghost" data-act="tvsfx">${tv.sfx ? '🔊' : '🔇'}</button><button class="ghost" data-act="menu">⚙️</button>`; }
+function tvBuild(status){
+  if (status === 'lobby') {
+    app.innerHTML = `<div class="tvtop"><span class="creep" style="font-size:1.8rem;color:#fda4af">${esc(CUR.title)}</span><span class="grow"></span>${tvTopButtons()}</div>
+    <div class="wrap lobby">
+      <div class="panel center"><div id="qr"></div><div class="code" id="code">${tv.code}</div><div class="mute small" style="word-break:break-all">${esc(studentURL())}</div>
+        <div class="mute" style="margin-top:8px">태블릿으로 QR을 찍고 이름을 넣어요.</div></div>
+      <div class="panel"><div class="row"><h2 style="flex:1">들어온 학생 <span id="cnt">0</span>명</h2><span class="mute small">이름을 누르면 내보낼 수 있어요</span></div>
+        <div class="names" id="names" style="margin:12px 0 18px"></div>
+        <div class="mute" id="chipsInfo"></div>
+        <div class="row" style="margin-top:16px"><button class="ghost" style="font-size:1.2rem" data-act="pracOpen">📚 문장 미리 연습</button><span class="grow" style="flex:1"></span><button class="red" style="font-size:1.6rem;padding:.6em 1.6em" data-act="startGame">시작 ▶</button></div></div>
+    </div>`;
+    makeQR($('#qr'), 340);
+  } else if (status === 'play') {
+    app.innerHTML = `<div class="tvtop"><span class="big-timer" id="timer"></span><span class="stat" id="st_esc"></span><span class="stat" id="st_dead"></span><span class="grow"></span>${tvTopButtons()}<button class="red" data-act="endNow">🏁 결과 보기</button></div>
+    <div class="wrap" style="max-width:1400px;display:grid;grid-template-columns:1fr 300px;gap:16px"><div class="grid" id="grid"></div><div><h3>📰 실시간 소식</h3><div class="feed" id="feed"></div></div></div>`;
+    tvTick();
+  } else if (status === 'end') {
+    app.innerHTML = `<div class="tvtop"><span class="creep" style="font-size:1.8rem;color:#fda4af">Results</span><span class="grow"></span>${tvTopButtons()}</div>
+    <div class="wrap"><div id="slide"></div><div class="row" style="justify-content:space-between;margin-top:14px"><button class="ghost" data-act="slidePrev">◀ 이전</button><span class="mute" id="slideNo"></span><button class="red" data-act="slideNext">다음 ▶</button></div></div>`;
+  } else if (status === 'closed') {
+    app.innerHTML = `<div class="wrap center"><div class="panel"><h2>방이 닫혔어요</h2><button class="red" data-act="newRoom">새 방 만들기</button></div></div>`;
+  }
+}
+function tvUpdateLobby(R, ps){
+  $('#cnt').textContent = ps.length;
+  $('#names').innerHTML = ps.map(p => `<span class="chip" data-act="kickAsk" data-arg="${p.pid}">${esc(p.name)}</span>`).join('') || '<span class="mute">아직 아무도 없어요…</span>';
+  const s = R.settings || {};
+  $('#chipsInfo').innerHTML = `⌛ ${s.time ? s.time + '분' : '제한 없음'} · 🏚️ ${esc(CUR.title)} · 🃏 ${s.card === 'past' ? CUR.chipP : CUR.chipF} · 🚩 체크포인트 ${s.cp ? '켬' : '끔'} · ✍️ ${({ tap: '눌러서 채우기', ghost: '따라 쓰기', speak: '말해서 채우기' })[s.known]}`;
+}
+function tvUpdateGame(R, ps){
+  const escN = ps.filter(p => p.st.escapedAt).length, deaths = ps.reduce((s, p) => s + (p.st.deaths || 0), 0);
+  $('#st_esc').textContent = `🎉 탈출 ${escN} / ${ps.length}`;
+  $('#st_dead').textContent = `💀 Game Over ${deaths}`;
+  $('#grid').innerHTML = ps.map(p => {
+    const st = p.st, sc = SCENES[st.scene || START];
+    const place = st.escapedAt ? `🎉 탈출 ${st.order || ''}번째` : !st.started ? '⏳ 이야기 읽는 중' : '📍 ' + (sc?.place || '');
+    const prog = st.escapedAt ? MAXPROG : (sc?.prog || 0);
+    return `<div class="pcard ${st.escapedAt ? 'esc' : ''}" data-act="detail" data-arg="${p.pid}"><div class="nm">${esc(p.name)}</div><div class="pl">${place}${!st.escapedAt && st.cp && st.cp !== START && R.settings?.cp ? ' 🚩' : ''}</div>
+      <div class="bar"><i style="width:${prog / MAXPROG * 100}%"></i></div><div class="row small" style="margin-top:6px;gap:12px"><span>💀 ${st.deaths || 0}</span><span>❌ ${st.wrong || 0}</span><span>✅ ${st.correct || 0}</span></div></div>`;
+  }).join('') || '<div class="mute">학생이 없어요. 📱 접속 QR을 눌러 들어오게 해 주세요.</div>';
+  const feed = Object.values(R.feed || {}).sort((a, b) => b.t - a.t).slice(0, 12);
+  $('#feed').innerHTML = feed.map(f => `<div>${esc(f.m)}</div>`).join('');
+}
+function tvOverlays(R, ps){
+  let h = '';
+  if (tv.qr) h = `<div class="ov" data-act="ovBg"><div class="box center"><div id="qr2"></div><div class="code">${tv.code}</div><div class="mute">튕긴 학생은 다시 찍고 같은 이름을 쓰면 이어서 해요.</div><button style="margin-top:12px" data-act="ovClose">닫기</button></div></div>`;
+  else if (tv.menu) h = `<div class="ov" data-act="ovBg"><div class="box"><h2>⚙️ 설정</h2><div class="row" style="flex-direction:column;align-items:stretch">
+      ${R.status === 'play' ? `<button data-act="plus5">⏳ 5분 더</button><button data-act="noLimit">♾️ 제한 없애기</button>` : ''}
+      <button data-act="restart">🔄 처음부터 다시 (학생들은 그대로)</button><button class="red" data-act="closeRoom">🚪 방 닫기</button><button class="ghost" data-act="ovClose">닫기</button></div></div></div>`;
+  else if (tv.practice) { const P = tv.practice, c = P.cards[P.i];
+    h = `<div class="ov"><div class="box" style="max-width:1000px"><div class="row"><b style="flex:1">📚 문장 미리 연습 ${P.i + 1} / ${P.cards.length}</b><button class="ghost" data-act="pracClose">닫기 ✕</button></div>
+      <div class="prac slab" style="margin:30px 0;color:#fde68a">${esc(c.p)}</div>
+      <div class="prac slab" style="color:${P.show ? '#6ee7b7' : '#475569'}">${P.show ? esc(c.f) : esc(CUR.pracHidden)}</div>
+      <div class="center mute" style="margin:18px 0;font-size:1.3rem">${P.show ? '' : esc(CUR.pracAsk)}</div>
+      <div class="row" style="justify-content:space-between"><button class="ghost" data-act="pracPrev">◀</button>${P.show ? `<button data-act="pracSpeak">🔊 다시 듣기</button>` : ''}<button class="red" data-act="pracNext">${P.show ? '다음 ▶' : '정답 보기'}</button></div></div></div>`; }
+  else if (tv.detail) { const p = ps.find(x => x.pid === tv.detail); if (!p) { tv.detail = null; } else { const st = p.st, sc = SCENES[st.scene || START], last = st.last;
+    h = `<div class="ov" data-act="ovBg"><div class="box"><div class="row"><h2 style="flex:1">${esc(p.name)}</h2><button class="ghost" data-act="ovClose">✕</button></div>
+      <div class="mute">${st.escapedAt ? '🎉 탈출!' : '📍 ' + esc(sc?.place)} · 💀 ${st.deaths || 0} · ❌ ${st.wrong || 0} · ✅ ${st.correct || 0}</div>
+      ${!st.escapedAt && sc ? `<h3 style="margin-top:14px">지금 장면의 두 문장</h3>${sc.c.map(c => `<div class="slab" style="font-size:1.3rem;margin:4px 0">· ${esc(c.f)}</div>`).join('')}` : ''}
+      ${last ? `<h3 style="margin-top:14px">최근에 낸 문장 ${last.ok ? '<span class="good">✔</span>' : '<span class="bad">✘</span>'}</h3><div class="slab sent" style="font-size:1.4rem">${(last.tiles || []).map((t, i) => `<span class="${last.tb?.[i] ? 'bad' : ''}">${esc(t)}</span>`).join('')} ${(last.w || []).map(w => `<span class="${w.b ? 'bad' : ''}">${esc(w.w)}</span>`).join('')}</div>` : ''}
+      <div class="row" style="margin-top:18px"><button class="red" data-act="kick" data-arg="${p.pid}">내보내기</button></div></div></div>`; } }
+  if (ovEl.dataset.h !== h) { ovEl.innerHTML = h; ovEl.dataset.h = h; if (tv.qr) makeQR($('#qr2'), 420); }
+}
+ACT.qr = () => { tv.qr = true; tvOverlays(tv.room, playersArr(tv.room)); };
+ACT.menu = () => { tv.menu = true; tvOverlays(tv.room, playersArr(tv.room)); };
+ACT.ovBg = (a, el, e) => { if (e.target === el) ACT.ovClose(); };
+ACT.ovClose = () => { tv.qr = tv.menu = false; tv.detail = null; tvOverlays(tv.room, playersArr(tv.room)); };
+ACT.detail = pid => { tv.detail = pid; tvOverlays(tv.room, playersArr(tv.room)); };
+ACT.bgm = () => { tv.bgm = !tv.bgm; tv.bgm ? bgmStart() : bgmStop(); tv.viewKey = null; tvRender(); };
+ACT.tvsfx = () => { tv.sfx = !tv.sfx; tv.viewKey = null; tvRender(); };
+ACT.kickAsk = pid => { const p = tv.room.players?.[pid]; if (p && confirm(`'${p.name}' 학생을 내보낼까요?`)) ACT.kick(pid); };
+ACT.kick = pid => { tv.detail = null; tv.ref.child('players/' + pid).remove(); };
+ACT.startGame = () => { const t = tv.room.settings?.time || 0; ac(); tv.ref.update({ 'meta/status': 'play', 'meta/startAt': TS, 'meta/endAt': t ? now() + t * 60000 : null, 'meta/escapeCount': 0 }); };
+ACT.endNow = () => { if (confirm('게임을 끝내고 결과를 볼까요?')) tv.ref.update({ 'meta/status': 'end' }); };
+ACT.plus5 = () => { const R = tv.room; tv.ref.update({ 'meta/endAt': Math.max(R.endAt || now(), now()) + 300000 }); ACT.ovClose(); };
+ACT.noLimit = () => { tv.ref.update({ 'meta/endAt': null }); ACT.ovClose(); };
+ACT.restart = async () => {
+  if (!confirm('처음부터 다시 할까요? (학생들은 방에 그대로 남아요)')) return;
+  const up = { 'meta/status': 'lobby', 'meta/round': (tv.room.round || 1) + 1, 'meta/escapeCount': 0, feed: null, miss: null, 'meta/startAt': null, 'meta/endAt': null };
+  Object.keys(tv.room.players || {}).forEach(pid => up[`players/${pid}/st`] = null);
+  tv.seenEsc = new Set(); tv.menu = false; await tv.ref.update(up);
+};
+ACT.closeRoom = async () => { if (!confirm('방을 닫을까요?')) return; bgmStop(); await tv.ref.update({ 'meta/status': 'closed' }); location.href = location.pathname; };
+ACT.newRoom = () => location.href = location.pathname;
+
+/* 문장 미리 연습 */
+ACT.pracOpen = () => {
+  const all = []; Object.values(SCENES).forEach(sc => sc.c.forEach(c => all.push(c)));
+  const seen = new Set(), uniq = all.filter(c => { const k = c.f; if (seen.has(k)) return false; seen.add(k); return true; });
+  tv.practice = { cards: shuffle(uniq).slice(0, 16), i: 0, show: false }; tvOverlays(tv.room, []);
+};
+ACT.pracNext = () => { const P = tv.practice; if (!P.show) { P.show = true; speak(P.cards[P.i].f); } else if (P.i < P.cards.length - 1) { P.i++; P.show = false; } else { tv.practice = null; } tvOverlays(tv.room, playersArr(tv.room)); };
+ACT.pracPrev = () => { const P = tv.practice; if (P.i > 0) { P.i--; P.show = false; } tvOverlays(tv.room, playersArr(tv.room)); };
+ACT.pracSpeak = () => speak(tv.practice.cards[tv.practice.i].f);
+ACT.pracClose = () => { tv.practice = null; tvOverlays(tv.room, playersArr(tv.room)); };
+
+/* 결과 슬라이드 */
+function slides(R){
+  const r = computeResults(R), out = [];
+  out.push(`<div class="slide center"><h2 class="creep" style="font-size:4rem;color:#fda4af">Time's up!</h2>
+    <div class="bigstats"><div>🎉 탈출<b>${r.esc.length} / ${r.ps.length}</b></div><div>💀 Game Over<b>${r.deaths}</b></div><div>✅ 맞게 쓴 문장<b>${r.correct}</b></div><div>🎯 정확도<b>${pct(r.acc)}</b></div><div>⚡ 가장 빠른 탈출<b style="font-size:1.6rem">${r.fastest ? esc(r.fastest.p.name) + '<br>' + fmtDur(r.fastest.t) : '-'}</b></div></div>
+    <div class="mute" style="font-size:1.3rem">우리 반은 모두 합쳐 문장 ${r.correct + r.wrong}개를 써서 냈어요!</div></div>`);
+  out.push(`<div class="slide"><h2>🃏 함정 순위</h2>${r.trapRank.length ? `<table class="res"><tr><th></th><th>함정</th><th>장소</th><th>빠진 횟수</th><th>빠진 학생</th></tr>${r.trapRank.map((t, i) => { const src = Object.entries(SCENES).find(([k, s]) => s.c.some(c => c.to === t.id)); return `<tr><td>${i + 1}</td><td style="font-size:1.4rem">${TRAPS[t.id].e} ${TRAPS[t.id].n}</td><td>${esc(src?.[1].place || '')}<div class="mute small slab">${esc(src?.[1].c.find(c => c.to === t.id)?.f || '')}</div></td><td><b>${t.n}</b></td><td>${t.who}명</td></tr>`; }).join('')}</table>` : '<p class="mute">아무도 함정에 빠지지 않았어요!</p>'}</div>`);
+  out.push(`<div class="slide"><h2>✏️ 우리 반이 자주 틀린 단어</h2>${r.misses.length ? `<table class="res"><tr><th>바른 철자</th><th>틀린 횟수</th><th>이렇게 썼어요</th></tr>${r.misses.map(m => `<tr><td class="slab good" style="font-size:1.5rem">${esc(m.e)}</td><td>${m.n}</td><td class="slab">${Object.entries(m.g).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([g, n]) => `<span class="bad">${esc(g)}</span>${n > 1 ? ` ×${n}` : ''}`).join(', ') || '<span class="mute">(빠뜨림)</span>'}</td></tr>`).join('')}</table>` : '<p class="mute">틀린 단어가 없어요. 완벽해요!</p>'}</div>`);
+  out.push(`<div class="slide"><h2>🏆 시상식</h2><div class="bigstats">${r.awards.map(a => `<div><div style="font-size:2.6rem">${a.icon}</div><div style="font-weight:900;font-size:1.2rem">${a.title}</div><div style="font-size:1.5rem;margin:6px 0">${a.names.map(esc).join(', ')}</div><div class="mute small">${esc(a.desc)}</div></div>`).join('') || '<div>상을 받을 기록이 없어요</div>'}</div></div>`);
+  out.push(`<div class="slide"><h2>📋 순위</h2><table class="res"><tr><th>#</th><th>이름</th><th>결과</th><th>💀</th><th>✅</th><th>❌</th></tr>${r.rank.map((p, i) => `<tr><td>${i + 1}</td><td><b>${esc(p.name)}</b></td><td>${p.st.escapedAt ? `🎉 탈출 (${fmtDur(p.st.escapedAt - (R.startAt || 0))})` : `📍 ${esc(SCENES[p.st.scene]?.place || '')} (${p.st.maxProg || 0}/${MAXPROG})`}</td><td>${p.st.deaths || 0}</td><td>${p.st.correct || 0}</td><td>${p.st.wrong || 0}</td></tr>`).join('')}</table>
+    <div class="center" style="margin-top:16px"><button class="red" style="font-size:1.4rem" data-act="restart">🔄 한 번 더</button></div></div>`);
+  return out;
+}
+function tvUpdateResults(R){ const S = slides(R); tv.slide = Math.min(tv.slide, S.length - 1); $('#slide').innerHTML = S[tv.slide]; $('#slideNo').textContent = `${tv.slide + 1} / ${S.length}`; }
+ACT.slideNext = () => { tv.slide++; tvUpdateResults(tv.room); };
+ACT.slidePrev = () => { tv.slide = Math.max(0, tv.slide - 1); tvUpdateResults(tv.room); };
+
+/* =====================================================================
+   학생 태블릿 화면
+   ===================================================================== */
+const S = { code: null, base: null, pid: null, name: null, meRef: null, room: { status: null, settings: {}, endAt: null, round: null, startAt: null }, st: null, joined: false,
+  sel: null, tiles: [], pool: [], fb: '', fbTone: '', words: null, tileBad: null, dead: null, explore: false, exSt: null, view: null, rec: null, coll: false, result: null };
+const fresh = () => ({ scene: START, cp: START, deaths: 0, wrong: 0, correct: 0, traps: {}, known: {}, maxProg: 0, started: false, mic: 0 });
+const cur = () => S.explore ? S.exSt : S.st;
+const sOn = () => S.room.settings?.sfx !== false;
+
+function stStart(code){
+  S.code = code; S.base = roomPath(code);
+  const r = db.ref(S.base);
+  let first = true;
+  r.child('meta').on('value', snap => {
+    const m = snap.val() || {};
+    useStory(m.settings?.story); applyStory(m.story);
+    const v = m.round ?? null;
+    if (S.room.round != null && v !== S.room.round && S.joined) { S.st = fresh(); S.dead = null; S.explore = false; S.result = null; S.sel = null; S.view = null; }
+    S.room = { status: m.status ?? null, settings: m.settings || {}, endAt: m.endAt ?? null, startAt: m.startAt ?? null, round: v };
+    if (first) { first = false; stAfterLoad(); } else stRender();
+  });
+  setInterval(stTick, 500);
+}
+function stAfterLoad(){
+  if (S.room.status == null) { app.innerHTML = `<div class="st"><div class="scene center"><h2>방을 찾을 수 없어요 😢</h2><p>방 번호를 확인해 주세요.</p></div></div>`; return; }
+  const saved = localStorage.getItem('sa_name_' + S.code);
+  if (saved) stJoin(saved, true); else stRender();
+}
+function stTick(){
+  const el = $('#stimer');
+  if (el && S.room.status === 'play') { if (S.room.endAt) { const left = S.room.endAt - now(); el.textContent = '⏳ ' + fmtClock(left); if (left <= 0 && S.view === 'game' && !S.explore) stRender(); } else el.textContent = ''; }
+  const d = $('#deadwait'); if (d && S.dead) { const left = S.dead.until - Date.now(); if (left <= 0) { d.disabled = false; d.textContent = S.dead.label; } else { d.disabled = true; d.textContent = `⏳ ${Math.ceil(left / 1000)}`; } }
+}
+async function stJoin(name, auto){
+  name = name.trim().replace(/\s+/g, ' ').slice(0, 12);
+  if (!name) return;
+  if (isBanned(name, S.room.settings?.banned)) { stJoinView('그 이름은 쓸 수 없어요. 다른 이름을 써 주세요.'); return; }
+  const pid = hash(name.toLowerCase());
+  const ref = db.ref(`${S.base}/players/${pid}`);
+  try {
+    const snap = await ref.get();
+    if (snap.exists() && !auto && localStorage.getItem('sa_pid_' + S.code) !== pid) { if (!confirm(`'${name}' 이름이 벌써 있어요.\n내 이름이 맞으면 [확인]을 눌러 이어서 해요.\n다른 친구라면 [취소]를 누르고 성까지 써 주세요.`)) return; }
+    if (!snap.exists()) { if (auto) { localStorage.removeItem('sa_name_' + S.code); stRender(); return; } await ref.set({ name, joined: TS }); }
+    S.pid = pid; S.name = name; S.meRef = ref; S.st = { ...fresh(), ...(snap.val()?.st || {}) }; S.st.traps ||= {}; S.st.known ||= {};
+    localStorage.setItem('sa_name_' + S.code, name); localStorage.setItem('sa_pid_' + S.code, pid);
+    S.joined = true;
+    ref.child('name').on('value', s => { if (s.val() === null && S.joined) { S.joined = false; localStorage.removeItem('sa_name_' + S.code); S.view = null; stJoinView('선생님이 방에서 내보냈어요. 이름을 다시 확인해 주세요.'); } });
+    stRender();
+  } catch (e) { stJoinView('들어가지 못했어요. 다시 해 주세요. (' + e.message + ')'); }
+}
+function save(fields){ if (S.explore || !S.meRef) return; const up = {}; for (const k in fields) up['st/' + k] = fields[k]; up['st/lastAt'] = TS; S.meRef.update(up).catch(() => {}); }
+function feed(m){ if (S.explore) return; db.ref(S.base + '/feed').push({ t: TS, m }); }
+
+function stJoinView(msg){
+  S.view = 'join';
+  app.innerHTML = `<div class="st"><div class="scene center" style="margin-top:30px"><div style="font-size:3.4rem">${CUR.emo}</div><h1 class="creep" style="font-size:2.6rem;color:#fda4af">${esc(CUR.title)}</h1>
+    <p class="mute">방 번호 <b>${esc(S.code)}</b> · 이름을 쓰고 들어가요</p>
+    <input id="nm" maxlength="12" placeholder="이름" style="font-size:1.6rem;padding:.5em;border-radius:14px;border:3px solid var(--sky);width:min(320px,100%);text-align:center" autocomplete="off">
+    <div class="fb" style="color:#fb7185">${esc(msg || '')}</div>
+    <button class="red go" data-act="join">들어가기 ▶</button></div></div>`;
+  const i = $('#nm'); i.focus(); i.addEventListener('keydown', e => { if (e.key === 'Enter') ACT.join(); });
+}
+ACT.join = () => { ac(); stJoin($('#nm').value, false); };
+
+function stRender(){
+  if (!S.joined) { if (S.room.status != null && S.view !== 'join') stJoinView(); return; }
+  const st = S.room.status;
+  const timeUp = st === 'play' && S.room.endAt && now() >= S.room.endAt;
+  if (st === 'closed') { S.view = 'closed'; app.innerHTML = `<div class="st"><div class="scene center"><h2>수업이 끝났어요 👋</h2></div></div>`; return; }
+  if (st === 'lobby') return stWait();
+  if (st === 'end' || timeUp) { if (!S.explore) return stResult(); }
+  if (st === 'play' || S.explore) {
+    if (!S.st.started && !S.explore) return stIntro();
+    if (S.dead) return stDead();
+    if (S.st.escapedAt && !S.explore) return stEscaped();
+    return stGame();
+  }
+}
+function stWait(){
+  S.view = 'wait';
+  app.innerHTML = `<div class="st"><div class="scene center" style="margin-top:20px"><div style="font-size:3rem">${CUR.emo}👦</div><h2>${esc(S.name)}, 반가워요!</h2>
+    <p style="font-size:1.2rem">${CUR.hook}</p><p class="mute">${CUR.waitLine}</p></div>
+    <div class="scene"><h3>🎮 이렇게 해요</h3><ol style="line-height:1.8;font-size:1.05rem">
+      <li>장면마다 <b>문장 카드 두 장</b> 중 하나를 골라요.</li>
+      <li>${CUR.howTiles}</li>
+      <li>나머지 문장을 <b>정확하게</b> 쓰고 <b>Go!</b> (🎤 말해서 써도 돼요)</li>
+      <li>틀린 길을 고르면 💀 <b>Game Over</b>! Start나 🚩 지나온 깃발부터 다시 해요. 함정에 빠지면 🃏 함정 카드를 모아요.</li></ol>
+      <p>🤫 바른 길은 친구에게 알려 주지 않아요. 스스로 찾아야 재미있어요!</p></div></div>`;
+}
+function stIntro(){
+  S.view = 'intro';
+  app.innerHTML = `<div class="st"><div class="scene center" style="margin-top:20px"><div style="font-size:3.6rem">${CUR.introEmo}</div><h1 class="creep" style="color:#fda4af;font-size:2.4rem">${esc(CUR.short)}</h1>
+    <p class="slab en" style="font-size:1.3rem;line-height:1.6">${esc(INTRO_EN)}</p><p class="mute">${esc(INTRO_KO)}</p>
+    <button class="red go" data-act="introGo">저택으로 들어가기 ▶</button></div></div>`;
+}
+ACT.introGo = () => { ac(); S.st.started = true; S.st.startedAt = Date.now(); save({ started: true, scene: S.st.scene, cp: S.st.cp, deaths: S.st.deaths, wrong: S.st.wrong, correct: S.st.correct, maxProg: S.st.maxProg }); enterScene(); stRender(); };
+function enterScene(){ const sc = SCENES[cur().scene]; const pool = []; sc.c.forEach(c => splitChoice(c).tiles.forEach(t => { if (!pool.some(x => x.toLowerCase() === t.toLowerCase())) pool.push(t); })); S.pool = shuffle(pool); S.sel = null; S.tiles = []; S.fb = ''; S.words = null; S.tileBad = null; }
+
+function topBar(){
+  const st = cur(), sc = SCENES[st.scene];
+  return `<div class="sbar"><span>${S.explore ? '🗺️ 탐험 중' : '👦 ' + esc(S.name)}</span><span class="grow"></span><span>💀 ${st.deaths || 0}</span><span>❌ ${st.wrong || 0}</span><span id="stimer"></span>
+    <button class="ghost" style="padding:.3em .7em" data-act="coll">🃏 ${Object.keys(S.st.traps || {}).length}/${TRAP_IDS.length}</button>${S.explore ? '<button class="ghost" style="padding:.3em .7em" data-act="exStop">탐험 그만</button>' : ''}</div>`;
+}
+function stGame(){
+  S.view = 'game';
+  const st = cur(), sc = SCENES[st.scene], set = S.room.settings || {};
+  if (!S.pool.length) enterScene();
+  const past = set.card === 'past';
+  const cards = sc.c.map((c, i) => { const known = st.known?.[st.scene + '_' + i]; return `<div class="choice ${S.sel === i ? 'on' : ''}" data-act="pick" data-arg="${i}">${known ? '<span class="tag">✍️ 써 봤어요</span>' : ''}<span class="slab">${esc(past ? c.p : c.f)}</span></div>`; }).join('');
+  let builder = '';
+  if (S.sel != null) {
+    const pool = S.pool.map((t, i) => `<span class="tile ${S.tiles.includes(t) ? 'used' : ''}" data-act="tile" data-arg="${i}">${esc(t)}</span>`).join('');
+    const placed = S.tiles.map((t, i) => `<span class="tile sel ${S.tileBad?.[i] ? 'wrong' : ''}" data-act="untile" data-arg="${i}">${esc(t)}</span>`).join('') || `<span class="mute small">↑ 조각을 ${CUR.mode === 'going' ? '' : '골라 '}순서대로 눌러요</span>`;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const micOk = set.mic !== false && SR;
+    const tail = splitChoice(sc.c[S.sel]).pos === 'tail';
+    const slotH = `<div class="slot">${placed}</div>`;
+    const inH = `<div class="inwrap ${S.fbTone === 'ok' ? 'okb' : S.fbTone === 'bad' ? 'badb' : ''}"><div class="bgw"></div><div class="ghosttxt" id="ghost"></div><input id="inp" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="" maxlength="60"></div>`;
+    builder = `<div class="builder"><div class="tiles">${pool}</div>
+      <div class="row" style="align-items:stretch;margin-top:6px">${tail ? inH + slotH : slotH + inH}
+      ${micOk ? `<button class="mic ${S.rec ? 'on' : ''}" data-act="mic">🎤</button>` : ''}<button class="green go" data-act="go">Go!</button></div>
+      <div class="fb" id="fb" style="color:${S.fbTone === 'ok' ? '#6ee7b7' : '#fda4af'}">${S.fb}</div></div>`;
+  }
+  const keepVal = $('#inp')?.value || '';
+  app.innerHTML = `${topBar()}<div class="st"><div class="scene"><div class="row"><span class="place">${esc(sc.place)}</span>${CHECKPOINTS[st.scene] && set.cp ? '<span>🚩</span>' : ''}</div>
+    <div class="emo">${sc.emo}</div><div class="en slab">${esc(sc.en)}</div><div class="ko">${esc(sc.ko)}</div>
+    <div class="choices">${cards}</div></div>${builder}</div>`;
+  const inp = $('#inp');
+  if (inp) { inp.value = S.keepInput ?? keepVal; S.keepInput = null; inp.addEventListener('input', updGhost); inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ACT.go(); } }); updGhost(); }
+  stTick();
+}
+function updGhost(){
+  const g = $('#ghost'), inp = $('#inp'); if (!g || !inp) return;
+  const st = cur(), set = S.room.settings || {};
+  const known = st.known?.[st.scene + '_' + S.sel];
+  if (!(known && (set.known === 'ghost' || set.known === 'speak'))) { g.innerHTML = ''; return; }
+  const rest = splitChoice(SCENES[st.scene].c[S.sel]).rest, v = inp.value;
+  g.innerHTML = rest.toLowerCase().startsWith(v.toLowerCase()) ? `<span class="typed">${esc(v)}</span>${esc(rest.slice(v.length))}` : '';
+}
+ACT.pick = i => {
+  i = +i; if (S.sel === i) return; sfx('tap', sOn());
+  S.sel = i; S.tiles = []; S.fb = ''; S.fbTone = ''; S.tileBad = null;
+  const st = cur(), set = S.room.settings || {}, known = st.known?.[st.scene + '_' + i];
+  S.keepInput = '';
+  if (known && set.known === 'tap') S.keepInput = splitChoice(SCENES[st.scene].c[i]).rest;
+  stGame();
+  if (known && set.known === 'speak') ACT.mic();
+};
+ACT.tile = i => { const t = S.pool[+i]; if (S.tiles.includes(t)) return; sfx('tap', sOn()); S.tiles.push(t); S.tileBad = null; S.keepInput = $('#inp')?.value; stGame(); };
+ACT.untile = i => { S.tiles.splice(+i, 1); S.tileBad = null; S.keepInput = $('#inp')?.value; stGame(); };
+ACT.mic = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return;
+  if (S.rec) { try { S.rec.stop(); } catch (e) {} return; }
+  const ch0 = SCENES[cur().scene].c[S.sel], ex0 = splitChoice(ch0), rest = ex0.rest;
+  try {
+    const r = new SR(); r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 5; S.rec = r;
+    r.onresult = e => {
+      const alts = [...e.results[0]].map(a => a.transcript);
+      const clean = a => { const t = ch0.t ? stripChunk(toks(a), ex0) : stripPrefix(toks(a)); return t.map(x => x.raw).join(' '); };
+      const want = norm(rest).replace(/\bokay\b/g, 'ok');
+      let pick = alts.map(clean).find(a => norm(a).replace(/\bokay\b/g, 'ok') === want) ?? clean(alts[0] || '');
+      S.keepInput = pick; S.usedMic = true; stGame();
+    };
+    r.onerror = ev => { S.rec = null; S.fb = ev.error === 'not-allowed' ? '🎤 마이크를 허용해 주세요.' : '🎤 잘 안 들렸어요. 다시 해 볼까요?'; S.fbTone = 'bad'; S.keepInput = $('#inp')?.value; stGame(); };
+    r.onend = () => { if (S.rec === r) { S.rec = null; S.keepInput = $('#inp')?.value; stGame(); } };
+    r.start(); S.keepInput = $('#inp')?.value; stGame();
+  } catch (e) { S.rec = null; }
+};
+ACT.go = () => {
+  if (S.sel == null) return;
+  const st = cur(), sc = SCENES[st.scene], ch = sc.c[S.sel], typed = $('#inp')?.value || '';
+  if (!S.tiles.length) { S.fb = '조각을 먼저 순서대로 눌러요!'; S.fbTone = 'bad'; S.keepInput = typed; return stGame(); }
+  if (!typed.trim()) { S.fb = '나머지 문장을 써요!'; S.fbTone = 'bad'; S.keepInput = typed; return stGame(); }
+  const g = grade(ch, S.tiles, typed);
+  const last = { sc: st.scene, ok: g.ok, tiles: S.tiles, tb: g.tileBad, w: g.words.map(x => ({ w: x.w, b: x.bad })) };
+  const usedMic = S.usedMic; S.usedMic = false;
+  if (!g.ok) {
+    st.wrong = (st.wrong || 0) + 1; sfx('wrong', sOn());
+    S.tileBad = g.tileBad;
+    const parts = [];
+    if (!g.tilesOk) parts.push(CUR.mode === 'going' ? `조각 순서가 달라요 (<b>${g.expTiles.join(' ')}</b>)` : '조각을 다시 확인해요 (단어와 순서)');
+    if (g.words.some(w => w.bad) || g.missing) parts.push(`빨간 단어를 고쳐요: ${g.words.map(w => `<span class="${w.bad ? 'bad' : ''}">${esc(w.w)}</span>`).join(' ')}${g.missing ? ' <span class="mute">(빠진 단어도 있어요)</span>' : ''}`);
+    S.fb = '❌ ' + parts.join('<br>'); S.fbTone = 'bad'; S.keepInput = typed;
+    save({ wrong: st.wrong, last });
+    if (!S.explore) g.pairs.forEach(p => db.ref(S.base + '/miss').push({ e: p.e, g: p.g }));
+    return stGame();
+  }
+  // 맞음
+  sfx('ok', sOn());
+  st.correct = (st.correct || 0) + 1; st.known[st.scene + '_' + S.sel] = 1; if (usedMic) st.mic = (st.mic || 0) + 1;
+  const to = ch.to, set = S.room.settings || {};
+  if (to === 'ESC') return doEscape(last);
+  if (TRAPS[to]) {
+    st.deaths = (st.deaths || 0) + 1;
+    const isNew = !S.st.traps[to]; S.st.traps[to] = (S.st.traps[to] || 0) + 1;
+    const back = set.cp ? st.cp : START;
+    const at = sc.place;
+    st.scene = back;
+    S.dead = { trap: to, isNew, until: Date.now() + (set.cp ? 5000 : 1500), label: back === START ? '↩ BACK TO START' : `🚩 ${CHECKPOINTS[back]}부터 다시` };
+    sfx('death', sOn());
+    save({ correct: st.correct, deaths: st.deaths, scene: st.scene, last, known: st.known, mic: st.mic || 0, [`traps/${to}`]: S.st.traps[to] });
+    feed(`💀 ${S.name} — ${at}`);
+    return stRender();
+  }
+  st.scene = to;
+  const prog = SCENES[to].prog; if (prog > (st.maxProg || 0)) st.maxProg = prog;
+  const up = { correct: st.correct, scene: to, maxProg: st.maxProg, last, known: st.known, mic: st.mic || 0 };
+  if (CHECKPOINTS[to] && set.cp && st.cp !== to && SCENES[to].prog > (SCENES[st.cp]?.prog || 0)) { st.cp = to; up.cp = to; sfx('flag', sOn()); feed(`🚩 ${S.name} → ${CHECKPOINTS[to]}`); }
+  save(up); enterScene(); stRender(); window.scrollTo(0, 0);
+};
+async function doEscape(last){
+  const st = cur();
+  sfx('win', sOn());
+  if (S.explore) { S.exSt.escapedAt = Date.now(); return stEscaped(true); }
+  st.maxProg = MAXPROG; st.escapedAt = Date.now();
+  let order = null;
+  try { const res = await db.ref(S.base + '/meta/escapeCount').transaction(n => (n || 0) + 1); order = res.snapshot.val(); } catch (e) {}
+  st.order = order;
+  save({ correct: st.correct, escapedAt: TS, order, maxProg: MAXPROG, last, known: st.known, mic: st.mic || 0, scene: st.scene });
+  feed(`🎉 ${S.name} 탈출! (${order}번째)`);
+  stRender();
+}
+function stDead(){
+  S.view = 'dead';
+  const T = TRAPS[S.dead.trap];
+  app.innerHTML = `${topBar()}<div class="st"><div class="dead"><div class="t creep">GAME OVER</div>
+    <div class="slab" style="font-size:1.3rem">${esc(T.en)}</div>
+    <div class="trapcard">${S.dead.isNew ? '<div style="font-weight:900;font-size:.85rem">🆕 새 함정 카드!</div>' : ''}<div class="e">${T.e}</div><div style="font-weight:900">${esc(T.n)}</div></div>
+    <div class="mute">💀 Billy가 ${cur().deaths}번째 함정에 빠졌어요… 다른 길을 골라 봐요!</div>
+    <button class="red go" id="deadwait" data-act="revive" disabled>⏳</button></div></div>`;
+  stTick();
+}
+ACT.revive = () => { if (!S.dead || Date.now() < S.dead.until) return; S.dead = null; enterScene(); stRender(); };
+function stEscaped(explore){
+  S.view = 'esc';
+  const st = cur();
+  if (explore) { app.innerHTML = `${topBar()}<div class="st"><div class="scene center"><div style="font-size:3rem">🎉</div><h2>탐험 탈출 성공!</h2><p class="slab">${esc(ESC_EN)}</p><button class="red go" data-act="exStart">🗺️ 다시 탐험하기</button> <button class="ghost go" data-act="exStop">탐험 그만</button></div></div>`; return; }
+  const t = S.room.startAt ? st.escapedAt - S.room.startAt : null;
+  app.innerHTML = `<div class="st"><div class="scene center" style="margin-top:20px"><div style="font-size:3.6rem">${CUR.winEmo}</div>
+    <h1 class="creep" style="color:#fde68a;font-size:2.6rem">${esc(CUR.winLine)}</h1><p class="slab" style="font-size:1.2rem">${esc(ESC_EN)}</p>
+    <h2>${st.order ? st.order + '번째로 탈출!' : '탈출 성공!'}</h2>
+    <div class="bigstats"><div>⏱️<b style="font-size:1.6rem">${t != null && t > 0 ? fmtDur(t) : '-'}</b></div><div>💀<b>${st.deaths || 0}</b></div><div>✅<b>${st.correct || 0}</b></div><div>❌<b>${st.wrong || 0}</b></div></div>
+    <p class="mute" style="margin-top:14px">🗺️ 기다리는 동안 가 보지 않은 길도 마음껏 가 봐요. 함정 카드도 더 모을 수 있어요! (탐험은 기록·순위에 들어가지 않아요)</p>
+    <button class="red go" data-act="exStart">🗺️ 자유 탐험하기</button></div>${collHTML()}</div>`;
+}
+ACT.exStart = () => { S.explore = true; S.exSt = { ...fresh(), started: true, known: { ...S.st.known } }; S.dead = null; enterScene(); stRender(); };
+ACT.exStop = () => { S.explore = false; S.exSt = null; S.dead = null; stRender(); };
+function collHTML(){ return `<div class="scene"><h3>🃏 함정 도감 ${Object.keys(S.st.traps || {}).length} / ${TRAP_IDS.length}</h3><div class="coll">${TRAP_IDS.map(id => S.st.traps?.[id] ? `<div><div class="e">${TRAPS[id].e}</div>${esc(TRAPS[id].n)}</div>` : `<div><div class="e">❓</div>???</div>`).join('')}</div></div>`; }
+ACT.coll = () => { ovEl.innerHTML = `<div class="ov" data-act="collBg"><div class="box">${collHTML()}<div class="center"><button data-act="collClose">닫기</button></div></div></div>`; };
+ACT.collClose = () => { ovEl.innerHTML = ''; };
+ACT.collBg = (a, el, e) => { if (e.target === el) ACT.collClose(); };
+async function stResult(){
+  if (S.view === 'result') return;
+  S.view = 'result';
+  const st = S.st;
+  app.innerHTML = `<div class="st"><div class="scene center"><h2>결과를 불러오는 중…</h2></div></div>`;
+  let rank = null, total = null;
+  try { const snap = await db.ref(S.base).get(); const R = flatRoom(snap.val()) || {}; const list = rankList(playersArr(R).filter(p => p.st.started)); total = list.length; rank = list.findIndex(p => p.pid === S.pid) + 1 || null; } catch (e) {}
+  S.result = true;
+  const acc = (st.correct || 0) + (st.wrong || 0) ? (st.correct || 0) / ((st.correct || 0) + (st.wrong || 0)) : null;
+  app.innerHTML = `<div class="st"><div class="scene center" style="margin-top:20px"><h1 class="creep" style="color:#fda4af;font-size:2.6rem">${st.escapedAt ? esc(CUR.winLine) : "Time's up!"}</h1>
+    <h2>${esc(S.name)} ${rank ? `· ${total}명 중 ${rank}등` : ''}</h2>
+    <p>${st.escapedAt ? `🎉 ${st.order ? st.order + '번째로 ' : ''}탈출했어요!` : `📍 ${esc(SCENES[st.scene]?.place || '')}까지 갔어요 (${st.maxProg || 0}/${MAXPROG})`}</p>
+    <div class="bigstats"><div>💀 Game Over<b>${st.deaths || 0}</b></div><div>✅ 맞은 문장<b>${st.correct || 0}</b></div><div>❌ 틀린 문장<b>${st.wrong || 0}</b></div><div>🎯 정확도<b>${pct(acc)}</b></div></div>
+    <p class="mute" style="margin-top:12px">TV 화면을 봐요! 👀</p></div>${collHTML()}</div>`;
+}
+
+
+/* ============ 문장 고치기 (교사) ============ */
+const ed = { draft: null };
+async function loadSavedStory(){
+  try { const v = (await db.ref(STORY_PATH()).get()).val(); applyStory(v || {}); } catch (e) {}
+  const n = Object.keys(STORY).length, el = $('#edInfo');
+  if (el) el.textContent = n ? `고친 장면 ${n}개가 적용돼 있어요` : '';
+}
+function edLabel(c){ return c.to === 'ESC' ? '🎉 탈출' : TRAPS[c.to] ? `💀 함정 (${TRAPS[c.to].e} ${TRAPS[c.to].n})` : `✅ 다음 → ${BASE_SCENES[c.to].place}`; }
+ACT.edOpen = () => {
+  const box = SCENE_ORDER.map((id, n) => {
+    const sc = SCENES[id];
+    return `<div class="panel" style="margin:10px 0" data-scene="${id}">
+      <div class="row"><b class="place" style="font-size:1.3rem">${n + 1}. ${esc(sc.place)}</b>${id === 'd1' ? '<span class="mute small">(빨간 문으로 돌아가는 길)</span>' : ''}${CHECKPOINTS[id] ? '<span>🚩</span>' : ''}</div>
+      <div class="lbl small mute" style="margin-top:6px">이야기 (영어)</div><textarea data-k="en" rows="2" class="edf">${esc(sc.en)}</textarea>
+      <div class="lbl small mute">이야기 (한국어 도움말)</div><textarea data-k="ko" rows="2" class="edf">${esc(sc.ko)}</textarea>
+      ${sc.c.map((c, i) => `<div style="margin-top:8px;padding:8px;border-radius:12px;background:var(--panel2)"><div class="small" style="font-weight:800">선택지 ${i + 1} · ${edLabel(c)}</div>
+        <input data-k="f${i}" class="edf slab" value="${esc(c.f)}" placeholder="${CUR.mode === 'going' ? "I'm going to ~" : '영어 문장'}">
+        ${CUR.mode === 'chunk' ? `<div class="row small" style="gap:6px"><span class="mute">눌러서 넣는 조각:</span><input data-k="t${i}" class="edf slab" style="flex:1" value="${esc(c.t)}" placeholder="예) twice a day / How often"></div>` : ''}
+        <input data-k="p${i}" class="edf slab" value="${esc(c.p)}" placeholder="${esc(CUR.pLabel)}"></div>`).join('')}
+    </div>`;
+  }).join('');
+  ovEl.innerHTML = `<div class="ov"><div class="box" style="max-width:900px">
+    <div class="row" style="position:sticky;top:-22px;background:var(--panel);padding:8px 0;z-index:2"><h2 style="flex:1">✏️ 문장 고치기 <span class="small mute">${esc(CUR.title)}</span></h2><button class="ghost" data-act="edReset">원래대로</button><button data-act="edClose">닫기</button><button class="red" data-act="edSave">저장</button></div>
+    <div class="mute small">${CUR.mode === 'going' ? "· 선택지 문장은 <b>I'm going to</b> 또는 <b>I'm not going to</b>로 시작해야 해요. 학생은 그 뒷부분을 똑같이 써야 통과해요." : '· <b>조각</b>은 문장 <b>맨 앞</b>(How often)이나 <b>맨 끝</b>(twice a day)에 있는 단어여야 해요. 학생은 조각을 누르고 나머지를 써요.'}<br>· 어느 선택지가 바른 길이고 함정인지는 그대로예요 (옆의 ✅ / 💀 표시). 함정 쪽 문장은 함정 이야기와 어울리게 고쳐 주세요.<br>· ${esc(CUR.pLabel.split(' (')[0])} 칸은 어려움 설정에서만 학생에게 보여요.<br>· 저장하면 다음에 만드는 수업 방부터 적용돼요.</div>
+    <div class="fb" id="edMsg" style="color:#fda4af"></div>${box}
+    <div class="center"><button class="red" data-act="edSave">저장</button></div></div></div>`;
+  ovEl.querySelectorAll('.edf').forEach(el => { el.style.cssText = 'width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#0f151d;color:var(--text);font-size:1rem;margin:3px 0;font-family:inherit'; if (el.tagName === 'INPUT') el.style.fontFamily = '"Roboto Slab",Georgia,serif'; });
+};
+ACT.edClose = () => { ovEl.innerHTML = ''; };
+ACT.edSave = async (a, btn) => {
+  const out = {}, errs = [];
+  ovEl.querySelectorAll('[data-scene]').forEach(box => {
+    const id = box.dataset.scene, b = BASE_SCENES[id], get = k => fixApos(box.querySelector(`[data-k="${k}"]`).value);
+    const o = {}, en = get('en'), ko = box.querySelector('[data-k="ko"]').value.trim();
+    if (en && en !== b.en) o.en = en;
+    if (ko !== b.ko) o.ko = ko;
+    const cs = b.c.map((c, i) => {
+      const f = get('f' + i), p = box.querySelector(`[data-k="p${i}"]`).value.trim(), x = {};
+      const tEl = box.querySelector(`[data-k="t${i}"]`), t = tEl ? get('t' + i) : '';
+      if (CUR.mode === 'going') { if (!/^I'm (not )?going to \S/.test(f)) errs.push(`${b.place} 선택지 ${i + 1}: I'm going to ~ 로 시작해야 해요`); }
+      else { const sp = splitChoice({ f, t }); if (!sp.tiles.length || !sp.rest) errs.push(`${b.place} 선택지 ${i + 1}: 조각이 문장 맨 앞이나 맨 끝에 있어야 해요`); if (t && t !== c.t) x.t = t; }
+      if (f && f !== c.f) x.f = f;
+      if (p && p !== c.p) x.p = p;
+      return x;
+    });
+    if (cs[0].f && cs[1].f && norm(cs[0].f) === norm(cs[1].f)) errs.push(`${b.place}: 두 선택지가 똑같아요`);
+    if (cs.some(x => Object.keys(x).length)) o.c = cs;
+    if (Object.keys(o).length) out[id] = o;
+  });
+  if (errs.length) { $('#edMsg').innerHTML = '⚠️ ' + errs.map(esc).join('<br>⚠️ '); ovEl.querySelector('.box').scrollTop = 0; return; }
+  btn.disabled = true;
+  try { await db.ref(STORY_PATH()).set(Object.keys(out).length ? out : null); applyStory(out); ovEl.innerHTML = ''; loadSavedStory(); }
+  catch (e) { $('#edMsg').textContent = '저장하지 못했어요: ' + e.message; btn.disabled = false; }
+};
+ACT.edReset = async () => {
+  if (!confirm('모든 문장을 처음 문장으로 되돌릴까요?')) return;
+  try { await db.ref(STORY_PATH()).remove(); } catch (e) {}
+  applyStory({}); ovEl.innerHTML = ''; loadSavedStory();
+};
+
+/* ============ 시작 ============ */
+(function main(){
+  if (!fbInit()) return;
+  const tvCode = params.get('tv'), room = params.get('room');
+  if (tvCode) tvStart(tvCode);
+  else if (room) stStart(room);
+  else { tvSetup(); loadSavedStory(); }
+})();
+</script>
+</body>
+</html>
